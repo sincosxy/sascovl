@@ -25,6 +25,7 @@ class Port(Base):
     name = Column(String, nullable=False)
     country = Column(String)
     code = Column(String, unique=True)
+    is_active = Column(Boolean, default=True)
 
 class Counterparty(Base):
     __tablename__ = "counterparties"
@@ -98,3 +99,5 @@ class GeneralCargoItem(Base):
     dimensions = Column(String) # Габариты (ДхШхВ)
 
     order = relationship("CargoOrder", back_populates="items")
+
+User.orders = relationship("CargoOrder", back_populates="owner")

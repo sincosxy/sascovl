@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     # Собираем URL для SQLAlchemy (asyncpg для асинхронности)
     DATABASE_URL: str | None = None
     SECRET_KEY: str
-    ALGORYTHM: str = "HS256"
+    ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
 
     @field_validator("DATABASE_URL", mode="before")

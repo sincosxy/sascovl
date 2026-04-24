@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="flex justify-between items-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-800">Панель администратора</h1>
+        <a href="/" class="text-blue-600 hover:underline">← На главную</a>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <!-- Форма создания юзера -->
+        <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Создать нового клиента</h2>
+            
+            <form hx-post="/api/admin/create-user" 
+                  hx-target="#admin-message" 
+                  hx-on::after-request="this.reset()"
+                  class="space-y-4">
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-600">Email (логин)</label>
+                    <input type="email" name="email" required 
+                           class="mt-1 block w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-600">Пароль</label>
+                    <input type="password" name="password" required 
+                           class="mt-1 block w-full border border-gray-300 rounded-md p-2">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-600">ФИО клиента / Название компании</label>
+                    <input type="text" name="full_name" 
+                           class="mt-1 block w-full border border-gray-300 rounded-md p-2">
+                </div>
+
+                <button type="submit" 
+                        class="w-full bg-green-600 text-white py-2 rounded-lg font-bold hover:bg-green-700 transition">
+                    Зарегистрировать
+                </button>
+            </form>
+            
+            <!-- Место для уведомлений -->
+            <div id="admin-message" class="mt-4 text-sm text-center"></div>
+        </div>
+
+        <!-- Статистика или инфо-блок -->
+        <div class="bg-blue-50 p-6 rounded-xl border border-blue-100">
+            <h2 class="text-xl font-semibold mb-4 text-blue-800">Информация</h2>
+            <ul class="space-y-2 text-blue-700 text-sm">
+                <li>• Все созданные пользователи по умолчанию имеют роль <b>User</b>.</li>
+                <li>• Пользователи сразу могут заходить в кабинет под своими данными.</li>
+                <li>• Пароли хешируются алгоритмом <b>Bcrypt</b>.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Добавляем расширение HTMX для отправки JSON -->
+<script src="https://unpkg.com"></script>
+{% endblock %}

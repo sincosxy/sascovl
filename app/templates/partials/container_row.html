@@ -1,0 +1,37 @@
+<tr class="hover:bg-gray-50 transition-colors">
+    <td class="p-2">
+        <select name="equipment_id[]" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+            {% for eq in equipments %}
+            <option value="{{ eq.id }}" 
+                {% if container and container.equipment_id == eq.id %}selected{% endif %}>
+                {{ eq.name }}
+            </option>
+            {% endfor %}
+        </select>
+    </td>
+    <td class="p-2 text-center">
+        <input type="checkbox" name="is_soc[]" value="{{ loop_index if loop_index is defined else 'NEW' }}" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+            {% if container and container.is_soc %}checked{% endif %}>
+    </td>
+    <td class="p-2">
+        <input type="text" name="container_number[]" placeholder="AAAA0000000" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            value="{{ container.container_number if container and container.container_number else '' }}">
+    </td>
+    <td class="p-2">
+        <input type="text" name="seal[]" placeholder="S12345" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            value="{{ container.seal if container and container.seal else '' }}">
+    </td>
+    <td class="p-2">
+        <input type="number" step="0.01" name="weight_gross[]" placeholder="0.00" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            value="{{ container.weight_gross if container and container.weight_gross else '' }}">
+    </td>
+    <td class="p-2">
+        <input type="text" name="cargo_description[]" placeholder="..." class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            value="{{ container.cargo_description if container and container.cargo_description else '' }}">
+    </td>
+    <td class="p-2 text-right">
+        <button type="button" onclick="this.closest('tr').remove()" class="text-red-400 hover:text-red-600 transition p-1">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+        </button>
+    </td>
+</tr>

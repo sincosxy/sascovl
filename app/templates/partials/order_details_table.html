@@ -1,0 +1,26 @@
+<div class="px-12 py-4 border-l-4 border-indigo-500">
+    <h4 class="text-xs font-bold text-gray-500 uppercase mb-2">Состав груза:</h4>
+    <table class="min-w-full text-xs text-gray-600">
+        <thead class="text-gray-400">
+            <tr>
+                <th class="pb-2">Тип</th>
+                <th class="pb-2">Номер</th>
+                <th class="pb-2">Пломба</th>
+                <th class="pb-2 text-right">Вес</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for con in order.containers %}
+            <tr class="border-t border-gray-200">
+                <td class="py-2 font-semibold">{{ con.equipment.name }}</td>
+                <td class="py-2">{{ con.container_number or '—' }} {% if con.is_soc %}(SOC){% endif %}</td>
+                <td class="py-2">{{ con.seal or '—' }}</td>
+                <td class="py-2 text-right">{{ con.weight_gross or '0' }} кг</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if not order.containers %}
+        <p class="text-gray-400 italic">Данные о грузе не заполнены</p>
+    {% endif %}
+</div>

@@ -1,0 +1,57 @@
+<div class="animate-in fade-in duration-500">
+    <h2 class="text-xl font-bold mb-4 text-gray-800">Шаг 1: Тип перевозки</h2>
+    <p class="text-sm text-gray-500 mb-6">Заказ №{{ order_id }}</p>
+    <nav class="flex items-center justify-center space-x-4 mb-8 text-sm font-medium">
+        <!-- Шаг 1 -->
+        <button hx-get="/api/orders/{{ order_id }}/step-1" hx-target="#main-content"
+                class="flex items-center {% if request.url.path.endswith('step-1') %}text-blue-600{% else %}text-gray-500 hover:text-blue-500{% endif %}">
+            <span class="w-7 h-7 flex items-center justify-center border-2 rounded-full mr-2 {% if request.url.path.endswith('step-1') %}border-blue-600 bg-blue-50{% else %}border-gray-300{% endif %}">1</span>
+            Тип
+        </button>
+
+        <div class="h-px w-8 bg-gray-300"></div>
+
+        <!-- Шаг 2 -->
+        <button hx-get="/api/orders/{{ order_id }}/step-2" hx-target="#main-content"
+                class="flex items-center {% if request.url.path.endswith('step-2') %}text-blue-600{% else %}text-gray-500 hover:text-blue-500{% endif %}">
+            <span class="w-7 h-7 flex items-center justify-center border-2 rounded-full mr-2 {% if request.url.path.endswith('step-2') %}border-blue-600 bg-blue-50{% else %}border-gray-300{% endif %}">2</span>
+            Маршрут
+        </button>
+
+        <div class="h-px w-8 bg-gray-300"></div>
+
+        <!-- Шаг 3 -->
+        <button hx-get="/api/orders/{{ order_id }}/step-3" hx-target="#main-content"
+                class="flex items-center {% if request.url.path.endswith('step-3') %}text-blue-600{% else %}text-gray-500 hover:text-blue-500{% endif %}">
+            <span class="w-7 h-7 flex items-center justify-center border-2 rounded-full mr-2 {% if request.url.path.endswith('step-3') %}border-blue-600 bg-blue-50{% else %}border-gray-300{% endif %}">3</span>
+            Груз
+        </button>
+    </nav>
+    <form hx-patch="/api/orders/{{ order_id }}/step-1" hx-target="#main-content" class="space-y-6" novalidate>
+        <div class="grid grid-cols-2 gap-4">
+            <!-- Вариант: Контейнер -->
+            <label class="relative border-2 border-gray-200 rounded-xl p-4 cursor-pointer hover:border-blue-500 transition has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50">
+               <input type="radio" name="transport_type" value="container" class="hidden" 
+                    {% if order and order.transport_type.value|lower == 'container' %}checked{% endif %}>
+                <div class="text-center">
+                    <span class="text-3xl">📦</span>
+                    <p class="font-semibold mt-2">Контейнер</p>
+                </div>
+            </label>
+
+            <!-- Вариант: Генгруз -->
+            <label class="relative border-2 border-gray-200 rounded-xl p-4 cursor-pointer hover:border-blue-500 transition has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50">
+                <input type="radio" name="transport_type" value="general_cargo" class="hidden"
+                    {% if order and order.transport_type.value|lower == 'general_cargo' %}checked{% endif %}>
+                <div class="text-center">
+                    <span class="text-3xl">🏗️</span>
+                    <p class="font-semibold mt-2">Ген. груз</p>
+                </div>
+            </label>
+        </div>
+
+        <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition">
+            Далее →
+        </button>
+    </form>
+</div>

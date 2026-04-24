@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CargoFlow</title>
+    <!-- Tailwind CSS -->
+    <!--script src="https://tailwindcss.com"></script-->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@2.0.0"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <nav class="bg-blue-600 p-4 text-white shadow-lg">
+        <!--div class="container mx-auto flex justify-between items-center">
+            <a href="/" class="font-bold text-xl">CargoFlow</a>
+            <div>
+                <button hx-post="/api/logout" hx-target="body" class="text-sm bg-red-500 px-3 py-1 rounded">Выйти</button>
+            </div>
+        </div-->
+        <div class="flex items-center space-x-4">
+            <button hx-get="/api/orders" 
+                    hx-target="main" 
+                    class="text-white hover:underline">
+                Мои заказы
+            </button>
+            <button hx-post="/api/logout" hx-target="body" class="text-sm bg-red-500 px-3 py-1 rounded">Выйти</button>
+        </div>
+    </nav>
+    
+    <main id="main-content" class="container mx-auto mt-10 p-4">
+        {% block content %}{% endblock %}
+    </main>
+
+</body>
+</html>

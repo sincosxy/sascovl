@@ -1,0 +1,117 @@
+<div class="animate-in slide-in-from-right duration-300">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold text-gray-800">Шаг 2: Маршрут и участники</h2>
+        <span class="text-xs font-mono bg-gray-100 px-2 py-1 rounded">ID: {{ order_id }}</span>
+    </div>
+    <nav class="flex items-center justify-center space-x-4 mb-8 text-sm font-medium">
+        <!-- Шаг 1 -->
+        <button hx-get="/api/orders/{{ order_id }}/step-1" hx-target="#main-content"
+                class="flex items-center {% if request.url.path.endswith('step-1') %}text-blue-600{% else %}text-gray-500 hover:text-blue-500{% endif %}">
+            <span class="w-7 h-7 flex items-center justify-center border-2 rounded-full mr-2 {% if request.url.path.endswith('step-1') %}border-blue-600 bg-blue-50{% else %}border-gray-300{% endif %}">1</span>
+            Тип
+        </button>
+
+        <div class="h-px w-8 bg-gray-300"></div>
+
+        <!-- Шаг 2 -->
+        <button hx-get="/api/orders/{{ order_id }}/step-2" hx-target="#main-content"
+                class="flex items-center {% if request.url.path.endswith('step-2') %}text-blue-600{% else %}text-gray-500 hover:text-blue-500{% endif %}">
+            <span class="w-7 h-7 flex items-center justify-center border-2 rounded-full mr-2 {% if request.url.path.endswith('step-2') %}border-blue-600 bg-blue-50{% else %}border-gray-300{% endif %}">2</span>
+            Маршрут
+        </button>
+
+        <div class="h-px w-8 bg-gray-300"></div>
+
+        <!-- Шаг 3 -->
+        <button hx-get="/api/orders/{{ order_id }}/step-3" hx-target="#main-content"
+                class="flex items-center {% if request.url.path.endswith('step-3') %}text-blue-600{% else %}text-gray-500 hover:text-blue-500{% endif %}">
+            <span class="w-7 h-7 flex items-center justify-center border-2 rounded-full mr-2 {% if request.url.path.endswith('step-3') %}border-blue-600 bg-blue-50{% else %}border-gray-300{% endif %}">3</span>
+            Груз
+        </button>
+    </nav>
+    <form hx-patch="/api/orders/{{ order_id }}/step-2" hx-target="#main-content" class="space-y-6">
+        
+        <!-- Секция ПОРТЫ -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg">
+            <div>
+                <label class="block text-xs font-semibold text-blue-700 uppercase">Порт погрузки (POL)</label>
+                <select name="pol_id" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2">
+                    <option value="" disabled selected>Выберите порт...</option>
+                    {% for port in ports %}
+                    <option value="{{ port.id }}" {% if order and order.pol_id == port.id %}selected{% endif %}>{{ port.name }} ({{ port.code }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-blue-700 uppercase">Порт выгрузки (POD)</label>
+                <select name="pod_id" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2">
+                    <option value="" disabled selected>Выберите порт...</option>
+                    {% for port in ports %}
+                    <option value="{{ port.id }}" {% if order and order.pod_id == port.id %}selected{% endif %}>{{ port.name }} ({{ port.code }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <!-- Секция УЧАСТНИКИ -->
+        <div class="space-y-4 pt-2">
+            <!--div>
+                <label class="block text-sm font-medium text-gray-700">Грузоотправитель (Shipper)</label>
+                <input type="text" name="shipper_name" required
+                       placeholder="Начните вводить название компании..." 
+                       class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 border">
+            </div-->
+            <div class="form-group space-y-4 pt-2">
+                <label class="block text-sm font-medium text-gray-700">Грузоотправитель (Shipper)</label>
+                <input type="text" required value="{{ order.shipper.name if order.shipper else ''}}"
+                    name="shipper_name" 
+                    list="shipper-list"
+                    placeholder="Начните вводить название..."
+                    hx-get="/api/counterparties/search" 
+                    hx-trigger="keyup changed delay:300ms" 
+                    hx-target="#shipper-list" 
+                    autocomplete="off"
+                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 border">
+                
+                <datalist id="shipper-list">
+                    <!-- Сюда HTMX подставит <option> из поиска -->
+                </datalist>
+            </div>
+            
+            <div class="form-group space-y-4 pt-2">
+                <label class="block text-sm font-medium text-gray-700">Грузополучатель (Consignee)</label>
+                <input type="text" name="consignee_name" required value="{{ order.consignee.name if order.consignee else ''}}"
+                        placeholder="ИНН или Название..." 
+                        list="consignee-list"
+                        hx-get="/api/counterparties/search" 
+                        hx-trigger="keyup changed delay:300ms" 
+                        hx-target="#consignee-list" 
+                        autocomplete="off"
+                        class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 border">
+                <datalist id="consignee-list">
+                    <!-- Сюда HTMX подставит <option> из поиска -->
+                </datalist>
+            </div>
+
+            <div class="form-group space-y-4 pt-2">
+                <label class="block text-sm font-medium text-gray-700">Уведомить (Notify Party)</label>
+                <input type="text"  value="{{ order.notify_party.name if order.notify_party else ''}}"
+                        name="notify_name" 
+                        placeholder="Оставьте пустым, если совпадает с получателем" 
+                        list="notify-list"
+                        hx-get="/api/counterparties/search" 
+                        hx-trigger="keyup changed delay:300ms" 
+                        hx-target="#notify-list" 
+                        autocomplete="off"
+                        class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 border">
+                <datalist id="notify-list">
+                    <!-- Сюда HTMX подставит <option> из поиска -->
+                </datalist>
+            </div>
+        </div>
+
+        <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition shadow-lg">
+            Далее: Детали груза →
+        </button>
+    </form>
+</div>
