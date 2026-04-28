@@ -1,32 +1,7 @@
 <div class="animate-in fade-in duration-500">
     <h2 class="text-xl font-bold mb-4 text-gray-800">Шаг 1: Тип перевозки</h2>
     <p class="text-sm text-gray-500 mb-6">Заказ №{{ order_id }}</p>
-    <nav class="flex items-center justify-center space-x-4 mb-8 text-sm font-medium">
-        <!-- Шаг 1 -->
-        <button hx-get="/api/orders/{{ order_id }}/step-1" hx-target="#main-content"
-                class="flex items-center {% if request.url.path.endswith('step-1') %}text-blue-600{% else %}text-gray-500 hover:text-blue-500{% endif %}">
-            <span class="w-7 h-7 flex items-center justify-center border-2 rounded-full mr-2 {% if request.url.path.endswith('step-1') %}border-blue-600 bg-blue-50{% else %}border-gray-300{% endif %}">1</span>
-            Тип
-        </button>
-
-        <div class="h-px w-8 bg-gray-300"></div>
-
-        <!-- Шаг 2 -->
-        <button hx-get="/api/orders/{{ order_id }}/step-2" hx-target="#main-content"
-                class="flex items-center {% if request.url.path.endswith('step-2') %}text-blue-600{% else %}text-gray-500 hover:text-blue-500{% endif %}">
-            <span class="w-7 h-7 flex items-center justify-center border-2 rounded-full mr-2 {% if request.url.path.endswith('step-2') %}border-blue-600 bg-blue-50{% else %}border-gray-300{% endif %}">2</span>
-            Маршрут
-        </button>
-
-        <div class="h-px w-8 bg-gray-300"></div>
-
-        <!-- Шаг 3 -->
-        <button hx-get="/api/orders/{{ order_id }}/step-3" hx-target="#main-content"
-                class="flex items-center {% if request.url.path.endswith('step-3') %}text-blue-600{% else %}text-gray-500 hover:text-blue-500{% endif %}">
-            <span class="w-7 h-7 flex items-center justify-center border-2 rounded-full mr-2 {% if request.url.path.endswith('step-3') %}border-blue-600 bg-blue-50{% else %}border-gray-300{% endif %}">3</span>
-            Груз
-        </button>
-    </nav>
+    {% include 'partials/wizard_nav.html' %}
     <form hx-patch="/api/orders/{{ order_id }}/step-1" hx-target="#main-content" class="space-y-6" novalidate>
         <div class="grid grid-cols-2 gap-4">
             <!-- Вариант: Контейнер -->

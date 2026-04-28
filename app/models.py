@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Enum, ForeignKey, Float, Boolean
+from sqlalchemy import Column, Integer, String, Enum, ForeignKey, Float, Boolean, Date, DateTime
 from sqlalchemy.orm import relationship
 from app.db import Base
 import enum
@@ -6,6 +6,7 @@ import enum
 class UserRole(enum.Enum):
     USER = "user"
     ADMIN = "admin"
+    OPERATOR = "operator"
 
 class User(Base):
     __tablename__ = "users"
@@ -63,6 +64,22 @@ class CargoOrder(Base):
     containers = relationship("Container", back_populates="order", cascade="all, delete-orphan")
     items = relationship("GeneralCargoItem", back_populates="order", cascade="all, delete-orphan")
 
+    # Pre-carriage (Экспорт / Пункт отправления)
+    pre_carriage_required = Column(Boolean, default=False)
+    pre_carriage_address = Column(String, nullable=True)
+    pre_carriage_contact = Column(String, nullable=True)
+    pre_carriage_date = Column(DateTime, nullable=True)
+    pre_carriage_comment = Column(String, nullable=True)
+    pre_carriage_carrier = Column(String, nullable=True)
+
+    # On-carriage (Импорт / Пункт назначения)
+    on_carriage_required = Column(Boolean, default=False)
+    on_carriage_address = Column(String, nullable=True)
+    on_carriage_contact = Column(String, nullable=True)
+    on_carriage_date = Column(DateTime, nullable=True)
+    on_carriage_comment = Column(String, nullable=True)
+
+
 class Equipment(Base):
     __tablename__ = "equipments"
 
@@ -79,9 +96,18 @@ class Container(Base):
     equipment_id = Column(Integer, ForeignKey("equipments.id"), nullable=False) # 20DC, 40HC и т.д.
     is_soc = Column(Boolean, default=False) # True - отправителя, False - линейный
     weight_gross = Column(Float)
+    pieces = Column(Integer, nullable=False)
     cargo_description = Column(String)
     container_number = Column(String, nullable=True)
     seal = Column(String, nullable=True)
+    pin_code = Column(String, nullable=True)
+
+    # --- поля для Рефов ---
+    temperature = Column(Float, nullable=True)
+    ventilation = Column(Boolean, default=False)
+    port_plug = Column(Boolean, default=False)
+    vessel_plug = Column(Boolean, default=False)
+    plug_start_date = Column(Date, nullable=True)
 
     order = relationship("CargoOrder", back_populates="containers")
     equipment = relationship("Equipment")

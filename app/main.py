@@ -10,8 +10,10 @@ from app.schemas import Token, UserLogin, CounterpartyCreate, CounterpartyRead, 
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
 from typing import List
+from datetime import datetime
 
 templates = Jinja2Templates(directory="app/templates")
+
 
 app = FastAPI(title="CargoFlow API")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
@@ -27,6 +29,22 @@ async def home(request: Request, db: AsyncSession = Depends(get_db)):
             context={"user": user}
         )
     except HTTPException:
+        return RedirectResponse(url="/login")
+
+@app.get("/1", response_class=HTMLResponse)
+async def home(request: Request, db: AsyncSession = Depends(get_db)):
+    try:
+        user = await get_current_user(request, db)
+        
+        # Если это админ или оператор — кидаем в панель управления
+        if user.role in [UserRole.ADMIN, UserRole.OPERATOR]:
+            return RedirectResponse(url="/api/operator/dashboard", status_code=303)
+        
+        # Если обычный клиент — кидаем в его список заказов
+        return RedirectResponse(url="/api/orders", status_code=303)
+        
+    except HTTPException:
+        # Если не залогинен — на страницу входа
         return RedirectResponse(url="/login")
     
 @app.get("/me")
@@ -228,6 +246,7 @@ async def save_step_1(
         .where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
     )
     order = result.scalars().first()
+
     if not order:
         raise HTTPException(status_code=404)
 
@@ -329,21 +348,21 @@ async def save_step_2(
     )
 
 @app.get("/api/orders/{order_id}/add-container-row")
-async def add_container_row(
-    order_id: int,
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    # Нам нужны типы оборудования для выпадающего списка в новой строке
-    result = await db.execute(select(Equipment))
-    equipments = result.scalars().all()
+async def add_container_row(request: Request, index: int = 0, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    # Теперь index берется из JS-параметра кнопки
+    eq_res = await db.execute(select(Equipment))
+    equipments = eq_res.scalars().all()
     
     return templates.TemplateResponse(
         request=request,
-        name="partials/container_row.html",
-        context={"equipments": equipments}
+        name="partials/container_row.html", 
+        context={
+            "equipments": equipments, 
+            "loop_index": index, # Передаем полученный индекс
+            "container": None
+        }
     )
+
 
 @app.patch("/api/orders/{order_id}/step-3")
 async def save_step_3(
@@ -354,11 +373,13 @@ async def save_step_3(
 ):
     form_data = await request.form()
     
-    # 1. Ищем заказ и проверяем владельца
-    # Добавляем joinedload портов сразу, чтобы они были на экране успеха
     result = await db.execute(
         select(CargoOrder)
-        .options(joinedload(CargoOrder.port_of_loading), joinedload(CargoOrder.port_of_discharge))
+        .options(
+            joinedload(CargoOrder.port_of_loading), 
+            joinedload(CargoOrder.port_of_discharge),
+            joinedload(CargoOrder.containers)
+        )
         .where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
     )
     order = result.scalars().first()
@@ -366,39 +387,130 @@ async def save_step_3(
     if not order:
         raise HTTPException(status_code=404, detail="Заказ не найден")
 
-    # 2. Извлекаем данные из формы
+
     eq_ids = form_data.getlist("equipment_id[]")
     numbers = form_data.getlist("container_number[]")
     seals = form_data.getlist("seal[]")
     weights = form_data.getlist("weight_gross[]")
+    pieces = form_data.getlist("pieces[]")
     descriptions = form_data.getlist("cargo_description[]")
-    soc_indices = form_data.getlist("is_soc[]") 
+    
+    soc_indices = form_data.getlist("is_soc[]")
+    vent_indices = form_data.getlist("ventilation[]")
+    port_indices = form_data.getlist("port_plug[]")
+    vessel_indices = form_data.getlist("vessel_plug[]")
+    
+    temps = form_data.getlist("temperature[]")
+    plug_dates = form_data.getlist("plug_start_date[]")
 
-    # 3. Очистка старых контейнеров
     await db.execute(delete(Container).where(Container.order_id == order_id))
 
-    # 4. Сохранение новых контейнеров
     for i in range(len(eq_ids)):
+        row_marker = str(i)
+        
+        def get_val(lst, idx, default=None):
+            return lst[idx] if idx < len(lst) else default
+
         new_con = Container(
             order_id=order_id,
             equipment_id=int(eq_ids[i]),
-            container_number=numbers[i] if numbers[i] and numbers[i].strip() else None,
-            seal=seals[i] if seals[i] and seals[i].strip() else None,
-            weight_gross=float(weights[i]) if weights[i] else 0.0,
-            cargo_description=descriptions[i] if descriptions[i] and descriptions[i].strip() else None,
-            is_soc=str(i) in soc_indices 
+            is_soc=row_marker in soc_indices,
+            container_number=get_val(numbers, i),
+            seal=get_val(seals, i),
+            weight_gross=float(get_val(weights, i)) if get_val(weights, i) else 0.0,
+            pieces=int(get_val(pieces, i)) if get_val(pieces, i) else 0,
+            cargo_description=get_val(descriptions, i),
+            
+            # Реф-поля
+            temperature=float(get_val(temps, i)) if get_val(temps, i) else None,
+            ventilation=row_marker in vent_indices,
+            port_plug=row_marker in port_indices,
+            vessel_plug=row_marker in vessel_indices,
         )
+        
+        # Обработка даты
+        date_str = get_val(plug_dates, i)
+        if date_str:
+            try:
+                new_con.plug_start_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            except ValueError:
+                new_con.plug_start_date = None
+
         db.add(new_con)
 
     await db.commit()
-    await db.refresh(order) # Освежаем объект после коммита
+    
+    # Освежаем объект для корректного отображения в success-шаблоне
+    await db.refresh(order)
 
-    # Теперь 'order' существует и наполнен данными для шаблона
     return templates.TemplateResponse(
         request=request,
-        name="partials/order_success.html",
+        name="partials/step_4_trucking.html",#"partials/order_success.html",
         context={"order_id": order_id, "order": order}
     )
+
+@app.patch("/api/orders/{order_id}/step-4")
+async def save_step_4(
+    order_id: int, 
+    request: Request, 
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    form_data = await request.form()
+    result = await db.execute(
+        select(CargoOrder).where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
+    )
+    order = result.scalars().first()
+
+    # Помощник для парсинга даты
+    def parse_dt(dt_str):
+        return datetime.strptime(dt_str, "%Y-%m-%dT%H:%M") if dt_str else None
+
+    # Сохранение Pre-carriage (Экспорт)
+    order.pre_carriage_required = "pre_carriage_required" in form_data
+    if order.pre_carriage_required:
+        order.pre_carriage_address = form_data.get("pre_carriage_address")
+        order.pre_carriage_contact = form_data.get("pre_carriage_contact")
+        order.pre_carriage_carrier = None
+    else:
+        order.pre_carriage_address = None
+        order.pre_carriage_contact = None
+        order.pre_carriage_carrier = form_data.get("pre_carriage_carrier")
+    order.pre_carriage_date = parse_dt(form_data.get("pre_carriage_date"))
+    order.pre_carriage_comment = form_data.get("pre_carriage_comment")
+
+    # Сохранение On-carriage (Импорт)
+    order.on_carriage_required = "on_carriage_required" in form_data
+    order.on_carriage_address = form_data.get("on_carriage_address")
+    order.on_carriage_contact = form_data.get("on_carriage_contact")
+    order.on_carriage_date = parse_dt(form_data.get("on_carriage_date"))
+    order.on_carriage_comment = form_data.get("on_carriage_comment")
+
+    await db.commit()
+
+    result = await db.execute(
+        select(CargoOrder)
+        .options(
+            joinedload(CargoOrder.port_of_loading),
+            joinedload(CargoOrder.port_of_discharge),
+            joinedload(CargoOrder.shipper),
+            joinedload(CargoOrder.consignee),
+            # Важно для таблицы контейнеров:
+            selectinload(CargoOrder.containers).joinedload(Container.equipment)
+        )
+        .where(CargoOrder.id == order_id)
+    )
+    order = result.scalars().first()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/order_summary.html", # Или тот шаблон, который ты вызываешь
+        context={
+            "order": order, 
+            "order_id": order_id
+        }
+    )
+
 
 @app.get("/api/orders")
 async def list_orders(
@@ -467,7 +579,7 @@ async def get_step_2(order_id: int, request: Request, db: AsyncSession = Depends
         context={"order": order, "order_id": order_id, "ports": ports}
     )
 
-# GET Шаг 3: Список контейнеров
+
 @app.get("/api/orders/{order_id}/step-3")
 async def get_step_3(
     order_id: int, 
@@ -475,20 +587,52 @@ async def get_step_3(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # Добавляем цепочку загрузки: Заказ -> Контейнеры -> Тип оборудования
     result = await db.execute(
-        select(CargoOrder).options(selectinload(CargoOrder.containers))
+        select(CargoOrder)
+        .options(
+            selectinload(CargoOrder.containers).joinedload(Container.equipment)
+        )
         .where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
     )
     order = result.scalars().first()
     
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+
     eq_res = await db.execute(select(Equipment))
     equipments = eq_res.scalars().all()
 
     return templates.TemplateResponse(
         request=request,
         name="partials/step_3_container.html",
-        context={"order": order, "order_id": order_id, "equipments": equipments}
+        context={
+            "order": order, 
+            "order_id": order_id, 
+            "equipments": equipments
+        }
     )
+
+@app.get("/api/orders/{order_id}/step-4")
+async def get_step_4(
+    order_id: int, 
+    request: Request, 
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    result = await db.execute(
+        select(CargoOrder).where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
+    )
+    order = result.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/step_4_trucking.html", 
+        context={"order": order, "order_id": order_id}
+    )
+
 
 @app.delete("/api/orders/{order_id}")
 async def delete_order(
@@ -512,25 +656,6 @@ async def delete_order(
     await db.commit()
     return HTMLResponse(status_code=200, content="")
 
-@app.get("/api/orders2")
-async def list_orders(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    result = await db.execute(
-        select(CargoOrder)
-        .options(
-            joinedload(CargoOrder.pol),
-            joinedload(CargoOrder.pod),
-            # Важно: грузим контейнеры и ИХ ТИПЫ
-            selectinload(CargoOrder.containers).joinedload(Container.equipment)
-        )
-        .where(CargoOrder.owner_id == current_user.id)
-        .order_by(CargoOrder.id.desc())
-    )
-    orders = result.scalars().all()
-    return templates.TemplateResponse(...)
 
 @app.get("/api/orders/{order_id}/details")
 async def get_order_details(
@@ -552,3 +677,158 @@ async def get_order_details(
         name="partials/order_details_table.html",
         context={"order": order}
     )
+
+@app.get("/api/orders/{order_id}/summary")
+async def get_order_summary(
+    order_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    result = await db.execute(
+        select(CargoOrder)
+        .options(
+            joinedload(CargoOrder.port_of_loading),
+            joinedload(CargoOrder.port_of_discharge),
+            joinedload(CargoOrder.shipper),
+            joinedload(CargoOrder.consignee),
+            joinedload(CargoOrder.notify_party),  # Добавь, если используешь его в шаблоне
+            # Загружаем контейнеры И их тип оборудования (Equipment)
+            selectinload(CargoOrder.containers).joinedload(Container.equipment)
+        )
+        .where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
+    )
+    order = result.scalars().first()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/order_summary.html",
+        context={"order": order, "order_id": order_id}
+    )
+
+@app.post("/api/orders/{order_id}/confirm")
+async def confirm_order(
+    order_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Находим заказ
+    result = await db.execute(
+        select(CargoOrder).where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
+    )
+    order = result.scalars().first()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+
+    # Меняем статус
+    order.status = "CONFIRMED"
+    
+    # Здесь можно добавить логику уведомления оператора (email или Telegram)
+    
+    await db.commit()
+
+    # После подтверждения возвращаем пользователя в список заказов (Dashboard)
+    # Используем HTMX-заголовок для перенаправления или просто отдаем список
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/order_success.html", # Финальное "Спасибо!"
+        context={"order": order, "order_id": order_id}
+    )
+
+@app.get("/api/operator/dashboard")
+async def operator_dashboard(
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        current_user = await get_current_user(request, db)
+        
+        # Проверка прав: если не админ и не оператор — на выход
+        if current_user.role not in [UserRole.ADMIN, UserRole.OPERATOR]:
+            #return RedirectResponse(url="/", status_code=303)
+            return Response(headers={"HX-Redirect": "/"})
+
+        result = await db.execute(
+            select(CargoOrder)
+            .options(
+                joinedload(CargoOrder.port_of_loading),
+                joinedload(CargoOrder.port_of_discharge),
+                # Добавляем загрузку оборудования для отображения в списке
+                selectinload(CargoOrder.containers).joinedload(Container.equipment)
+            )
+            .where(CargoOrder.status != "draft")
+            .order_by(CargoOrder.id.desc())
+        )
+        orders = result.scalars().all()
+
+        return templates.TemplateResponse(
+            request=request,
+            name="operator/dashboard.html", # Лучше держать в папке operator, чтобы не путать с клиентским
+            context={"user": current_user, "orders": orders}
+        )
+    except HTTPException:
+        response = RedirectResponse(url="/login", status_code=303)
+        response.headers["HX-Redirect"] = "/login" # Заставит HTMX сделать полный редирект
+        return response
+    
+@app.get("/api/operator/orders/{order_id}/manage")
+async def manage_order(order_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+    # Загружаем всё, включая данные по автодоставке и перевозчикам
+    result = await db.execute(
+        select(CargoOrder)
+        .options(
+            joinedload(CargoOrder.port_of_loading),
+            joinedload(CargoOrder.port_of_discharge),
+            selectinload(CargoOrder.containers).joinedload(Container.equipment)
+        )
+        .where(CargoOrder.id == order_id)
+    )
+    order = result.scalars().first()
+    
+    return templates.TemplateResponse(
+        request=request,
+        name="operator/manage_order.html",
+        context={"order": order, "user": getattr(request.state, "user", None)}
+    )
+
+@app.post("/api/operator/orders/{order_id}/update-ops")
+async def update_order_ops(
+    order_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    form_data = await request.form()
+    ids = form_data.getlist("container_id[]")
+    numbers = form_data.getlist("container_number[]")
+    pins = form_data.getlist("pin_code[]")
+    action = form_data.get("action") # save или confirm
+
+    for i in range(len(ids)):
+        con_id = int(ids[i])
+        # Ищем конкретный контейнер
+        result = await db.execute(select(Container).where(Container.id == con_id))
+        container = result.scalar_one()
+        
+        # Обновляем только если это COC (номера и пины)
+        if not container.is_soc:
+            # Номера могут приходить в меньшем количестве, если часть полей была readonly
+            # Но мы используем скрытые поля или фиксированные индексы
+            if i < len(numbers): container.container_number = numbers[i]
+            if i < len(pins): container.pin_code = pins[i]
+
+    # Если нажата кнопка "Подтвердить и запустить"
+    if action == "confirm":
+        result = await db.execute(select(CargoOrder).where(CargoOrder.id == order_id))
+        order = result.scalar_one()
+        order.status = "IN_PROGRESS"
+
+    await db.commit()
+    
+    # Редирект обратно в дашборд оператора
+    #return Response(headers={"HX-Redirect": "/api/operator/dashboard"})
+    return await operator_dashboard(request, db)

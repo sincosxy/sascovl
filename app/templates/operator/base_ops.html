@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CargoFlow</title>
+    <!-- Tailwind CSS -->
+    <!--script src="https://tailwindcss.com"></script-->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@2.0.0"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Навигация оператора -->
+    <nav class="bg-slate-900 text-white shadow-2xl">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-8">
+                    <span class="text-xl font-black tracking-tighter text-blue-400">CARGO<span class="text-white">OPS</span></span>
+                    <div class="flex gap-4 text-sm font-medium">
+                        <button hx-get="/api/operator/dashboard" hx-target="#main-content" class="hover:text-blue-400 transition">
+                            Заказы
+                        </button>
+                        <button class="text-gray-500 cursor-not-allowed">Контрагенты</button>
+                        <button class="text-gray-500 cursor-not-allowed">Сток</button>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-right hidden md:block">
+                        <div class="text-xs text-gray-400">Оператор</div>
+                        <div class="text-sm font-bold">{{ user.username }}</div>
+                    </div>
+                    <button hx-post="/api/logout" hx-target="body" class="bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white px-3 py-1.5 rounded transition text-xs font-bold border border-red-500/50">
+                        Выход
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Контентная область -->
+    <main id="main-content" class="container mx-auto mt-6 px-4 pb-12">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script>
+        // Чтобы HTMX всегда знал, куда подгружать ответы из меню оператора
+        document.body.addEventListener('htmx:beforeSwap', function(evt) {
+            if (evt.detail.target.id === "main-content") {
+                window.scrollTo(0, 0);
+            }
+        });
+    </script>
+</body>
+</html>

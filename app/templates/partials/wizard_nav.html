@@ -1,0 +1,25 @@
+<nav class="flex items-center justify-center space-x-4 mb-8 text-sm font-medium">
+    {% set steps = [
+        ('step-1', '1', 'Тип'),
+        ('step-2', '2', 'Маршрут'),
+        ('step-3', '3', 'Груз'),
+        ('step-4', '4', 'Транспорт')
+    ] %}
+
+    {% for path, num, label in steps %}
+        {% set is_active = request.url.path.endswith(path) %}
+        
+        <button hx-get="/api/orders/{{ order_id }}/{{ path }}" hx-target="#main-content"
+                class="flex items-center {{ 'text-blue-600' if is_active else 'text-gray-500 hover:text-blue-500' }}">
+            <span class="w-7 h-7 flex items-center justify-center border-2 rounded-full mr-2 
+                {{ 'border-blue-600 bg-blue-50' if is_active else 'border-gray-300' }}">
+                {{ num }}
+            </span>
+            {{ label }}
+        </button>
+
+        {% if not loop.last %}
+            <div class="h-px w-8 bg-gray-300"></div>
+        {% endif %}
+    {% endfor %}
+</nav>

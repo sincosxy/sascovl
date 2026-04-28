@@ -1,8 +1,17 @@
-<tr class="hover:bg-gray-50 transition-colors">
-    <td class="p-2">
-        <select name="equipment_id[]" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+{% set row_id = range(1, 99999) | random if not container else container.id %}
+
+<!-- Основная строка -->
+
+<tr class="hover:bg-gray-50 transition-colors border-t border-gray-200" id="main-row-{{ row_id }}">
+    <input type="hidden" name="row_idx[]" value="{{ loop_index }}">
+    <td class="p-2"> 
+        <select name="equipment_id[]" required 
+            onchange="toggleReeferRow('{{ row_id }}', this)"
+            class="w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
+            <option value="">Тип</option>
             {% for eq in equipments %}
             <option value="{{ eq.id }}" 
+                data-is-reefer="{{ 'true' if 'RF' in eq.name else 'false' }}"
                 {% if container and container.equipment_id == eq.id %}selected{% endif %}>
                 {{ eq.name }}
             </option>
@@ -10,28 +19,70 @@
         </select>
     </td>
     <td class="p-2 text-center">
-        <input type="checkbox" name="is_soc[]" value="{{ loop_index if loop_index is defined else 'NEW' }}" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-            {% if container and container.is_soc %}checked{% endif %}>
+        <input type="checkbox" name="is_soc[]" onchange="toggleContainerInput(this)" value="{{ loop_index }}"
+            {% if container and container.is_soc %}checked{% endif %}
+            class="h-4 w-4 text-indigo-600 border-gray-300 rounded">
     </td>
     <td class="p-2">
-        <input type="text" name="container_number[]" placeholder="AAAA0000000" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            value="{{ container.container_number if container and container.container_number else '' }}">
+        <input type="text" name="container_number[]" placeholder="AAAA0000000"
+            {% if not container or not container.is_soc %}readonly{% endif %}
+            class="w-full rounded-md border-gray-300 shadow-sm sm:text-sm disabled:bg-gray-100"
+            value="{{ container.container_number if container else '' }}">
     </td>
     <td class="p-2">
-        <input type="text" name="seal[]" placeholder="S12345" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            value="{{ container.seal if container and container.seal else '' }}">
+        <input type="text" name="seal[]" placeholder="S12345" class="w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
+            value="{{ container.seal if container else '' }}">
     </td>
     <td class="p-2">
-        <input type="number" step="0.01" name="weight_gross[]" placeholder="0.00" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            value="{{ container.weight_gross if container and container.weight_gross else '' }}">
+        <input type="number" step="0.01" name="weight_gross[]" placeholder="0.00" class="w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
+            value="{{ container.weight_gross if container else '' }}">
     </td>
     <td class="p-2">
-        <input type="text" name="cargo_description[]" placeholder="..." class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            value="{{ container.cargo_description if container and container.cargo_description else '' }}">
+        <input type="number" step="1" name="pieces[]" placeholder="10" class="w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
+            value="{{ container.pieces if container else '' }}">
+    </td>
+    <td class="p-2">
+        <input type="text" name="cargo_description[]" placeholder="..." class="w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
+            value="{{ container.cargo_description if container else '' }}">
     </td>
     <td class="p-2 text-right">
-        <button type="button" onclick="this.closest('tr').remove()" class="text-red-400 hover:text-red-600 transition p-1">
+        <!-- Удаляем сразу обе строки (основную и рефку) -->
+        <button type="button" onclick="removeContainerRow('{{ row_id }}')" class="text-red-400 hover:text-red-600">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
         </button>
+    </td>
+</tr>
+
+<!-- Строка рефрижератора (скрыта по умолчанию) -->
+<tr id="reefer-row-{{ row_id }}" 
+    class="bg-blue-50/50 {% if not (container and container.equipment and 'RF' in container.equipment.name) %}hidden{% endif %} reefer-params-row">
+    <td colspan="7" class="p-3 border-b border-gray-200">
+        <div class="flex flex-wrap items-center gap-4 text-xs">
+            <div class="flex items-center gap-2">
+                <span class="font-semibold text-blue-700 uppercase">Реф-режим:</span>
+                <input type="number" step="0.1" name="temperature[]" 
+                       value="{{ container.temperature if container and container.temperature != None else '' }}" 
+                       class="w-16 rounded border-gray-300 p-1">
+            </div>
+            
+            <label class="flex items-center gap-1">
+                <input type="checkbox" name="ventilation[]" value="{{ loop_index }}"
+                       {% if container and container.ventilation %}checked{% endif %}> Вент.
+            </label>
+
+            <label class="flex items-center gap-1">
+                <input type="checkbox" name="port_plug[]" value="{{ loop_index }}"
+                       {% if container and (container.port_plug or container.port_plug is none) %}checked{% endif %}> Порт
+            </label>
+
+            <input type="date" name="plug_start_date[]" 
+                   value="{{ container.plug_start_date if container and container.plug_start_date else '' }}"
+                   class="rounded border-gray-300 p-1">
+
+            <label class="flex items-center gap-1">
+                <input type="checkbox" name="vessel_plug[]" value="{{ loop_index }}"
+                       {% if container and (container.vessel_plug or container.vessel_plug is none) %}checked{% endif %}> Судно
+            </label>
+        </div>
     </td>
 </tr>

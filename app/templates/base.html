@@ -6,6 +6,7 @@
     <title>CargoFlow</title>
     <!-- Tailwind CSS -->
     <!--script src="https://tailwindcss.com"></script-->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@2.0.0"></script>
@@ -24,6 +25,13 @@
                     class="text-white hover:underline">
                 Мои заказы
             </button>
+            {% if user and user.role in ['ADMIN', 'OPERATOR'] %}
+            <button hx-get="/api/operator/dashboard" 
+                hx-target="main" 
+                class="bg-blue-800 hover:bg-blue-900 px-3 py-1 rounded text-sm font-bold border border-blue-400">
+            👷 Панель оператора
+            </button>
+            {% endif %}
             <button hx-post="/api/logout" hx-target="body" class="text-sm bg-red-500 px-3 py-1 rounded">Выйти</button>
         </div>
     </nav>

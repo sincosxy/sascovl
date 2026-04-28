@@ -1,0 +1,131 @@
+<div id="step-container" class="max-w-4xl mx-auto p-6 bg-white shadow-lg rounded-lg">
+    <!-- Навигация (Wizard Nav) -->
+    {% include 'partials/wizard_nav.html' %}
+
+    <h2 class="text-2xl font-bold mb-6 text-gray-800 border-b pb-2">Шаг 4: Наземная доставка</h2>
+    
+    <form hx-patch="/api/orders/{{ order_id }}/step-4" hx-target="#main-content" class="space-y-6">
+        
+        <!-- СЕКЦИЯ: ПУНКТ ОТПРАВЛЕНИЯ -->
+        <div x-data="{ pre_req: {{ 'true' if order.pre_carriage_required else 'false' }} }" 
+             class="p-5 border-2 rounded-xl transition-colors"
+             :class="pre_req ? 'border-blue-100 bg-blue-50/30' : 'border-orange-100 bg-orange-50/30'">
+            
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 rounded-lg" :class="pre_req ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                            <path d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-gray-800">Подача порожнего / Забор груза</h3>
+                        <p class="text-xs text-gray-500">Пункт отправления</p>
+                    </div>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" name="pre_carriage_required" x-model="pre_req" class="sr-only peer">
+                    <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                    <span class="ml-3 text-sm font-medium text-gray-600" x-text="pre_req ? 'Нужна автодоставка' : 'Свой вывоз'"></span>
+                </label>
+            </div>
+
+            <!-- ВАРИАНТ А: Автодоставка НУЖНА -->
+            <div x-show="pre_req" x-transition class="space-y-4 pt-4 border-t border-blue-100">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-gray-500 uppercase">Адрес склада (Затарка)</label>
+                        <input type="text" name="pre_carriage_address" value="{{ order.pre_carriage_address or '' }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 uppercase">Контакт на складе</label>
+                        <input type="text" name="pre_carriage_contact" value="{{ order.pre_carriage_contact or '' }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 uppercase">Дата/Время подачи</label>
+                        <input type="datetime-local" name="pre_carriage_date" value="{{ order.pre_carriage_date.strftime('%Y-%m-%dT%H:%M') if order.pre_carriage_date else '' }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                    </div>
+                </div>
+            </div>
+
+            <!-- ВАРИАНТ Б: СВОЙ ВЫВОЗ (Разнарядка на перевозчика клиента) -->
+            <div x-show="!pre_req" x-transition class="space-y-4 pt-4 border-t border-orange-100">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-orange-700 uppercase">Транспортная компания (Ваш перевозчик)</label>
+                        <input type="text" name="pre_carriage_carrier" value="{{ order.pre_carriage_carrier or '' }}" placeholder="Укажите, на кого делать разнарядку" class="mt-1 block w-full rounded-md border-orange-200 bg-white shadow-sm focus:border-orange-500 focus:ring-orange-500 sm:text-sm">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-gray-500 uppercase">Комментарий по подаче</label>
+                        <textarea name="pre_carriage_comment" rows="2" class="mt-1 block w-full rounded-md border-gray-200 shadow-sm sm:text-sm">{{ order.pre_carriage_comment or '' }}</textarea>
+                    </div>
+                </div>
+                <p class="text-[10px] text-orange-600 italic">Оператор подготовит разнарядку и ПИН-код на указанного перевозчика после подтверждения заявки.</p>
+            </div>
+        </div>
+
+        <!-- СЕКЦИЯ: ПУНКТ НАЗНАЧЕНИЯ -->
+        <div x-data="{ on_req: {{ 'true' if order.on_carriage_required else 'false' }} }" 
+             class="p-5 border-2 rounded-xl transition-colors"
+             :class="on_req ? 'border-green-100 bg-green-50/30' : 'border-gray-100 bg-gray-50/30'">
+            
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 rounded-lg" :class="on_req ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                            <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-gray-800">Вывоз из порта / Доставка до двери</h3>
+                        <p class="text-xs text-gray-500">Пункт назначения</p>
+                    </div>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" name="on_carriage_required" x-model="on_req" class="sr-only peer">
+                    <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-green-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                    <span class="ml-3 text-sm font-medium text-gray-600" x-text="on_req ? 'Нужна автодоставка' : 'Свой вывоз'"></span>
+                </label>
+            </div>
+
+            <div x-show="on_req" x-transition class="space-y-4 pt-4 border-t border-green-100">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-gray-500 uppercase">Адрес выгрузки</label>
+                        <input type="text" name="on_carriage_address" value="{{ order.on_carriage_address or '' }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 uppercase">Контакт получателя</label>
+                        <input type="text" name="on_carriage_contact" value="{{ order.on_carriage_contact or '' }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 uppercase">Дата доставки</label>
+                        <input type="datetime-local" name="on_carriage_date" value="{{ order.on_carriage_date.strftime('%Y-%m-%dT%H:%M') if order.on_carriage_date else '' }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm">
+                    </div>
+                </div>
+            </div>
+
+            <div x-show="!on_req" x-transition class="pt-4 border-t border-gray-100">
+                <p class="text-sm text-gray-500 italic text-center">Вывоз будет осуществлен силами клиента. ПИН-код на забор груженого контейнера из порта будет предоставлен после прибытия судна.</p>
+            </div>
+        </div>
+        <!--div class="flex justify-between items-center pt-6 border-t">
+            <button type="button" hx-get="/api/orders/{{ order_id }}/step-3" hx-target="#main-content" class="px-6 py-2 border rounded-md text-gray-600 hover:bg-gray-50 transition">Назад к грузу</button>
+            <button type="submit" class="px-10 py-3 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 shadow-lg transition transform hover:-translate-y-0.5">Сохранить и завершить</button>
+        </div-->
+        <div class="flex justify-between items-center mt-6"><div class="flex space-x-3"></div>
+        <div class="flex space-x-3">
+            <button type="button" 
+                    hx-get="/api/orders/{{ order_id }}/step-3" 
+                    hx-target="#main-content"
+                    class="px-6 py-2 text-gray-600 hover:text-gray-800 transition">
+                Назад
+            </button>
+            <button type="submit" class="px-8 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition shadow-md font-medium">
+                Сохранить и завершить
+            </button>
+        </div></div>
+    </form>
+</div>

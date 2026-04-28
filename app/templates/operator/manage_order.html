@@ -1,0 +1,88 @@
+<div class="max-w-5xl mx-auto space-y-6">
+    <div class="flex items-center justify-between bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        <button hx-get="/api/operator/dashboard" hx-target="#main-content" class="text-blue-600 hover:underline">
+            ← Назад к списку
+        </button>
+        <div class="text-right">
+            <span class="text-xs text-gray-500 uppercase font-bold">Статус заказа:</span>
+            <span class="ml-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-bold text-sm">{{ order.status }}</span>
+        </div>
+    </div>
+
+    <form hx-post="/api/operator/orders/{{ order.id }}/update-ops" hx-target="#main-content" class="space-y-6">
+        <!-- Блок: Контейнеры и Оборудование -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200">
+            <div class="bg-gray-800 p-4 text-white font-bold">Управление оборудованием</div>
+            <div class="p-4">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-gray-500 border-b">
+                            <th class="p-2 text-left">Тип</th>
+                            <th class="p-2 text-left">Собственность</th>
+                            <th class="p-2 text-left">Номер контейнера</th>
+                            <th class="p-2 text-left">ПИН на выдачу (для клиента)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for con in order.containers %}
+                        <tr class="border-b">
+                            <td class="p-2 font-bold">{{ con.equipment.name }}</td>
+                            <td class="p-2">
+                                <span class="{{ 'text-purple-600' if con.is_soc else 'text-blue-600' }}">
+                                    {{ 'SOC' if con.is_soc else 'COC' }}
+                                </span>
+                            </td>
+                            <td class="p-2">
+                                <input type="hidden" name="container_id[]" value="{{ con.id }}">
+                                {% if con.is_soc %}
+                                    <input type="text" class="bg-gray-100 border rounded p-1 w-full text-gray-500" value="{{ con.container_number }}" readonly>
+                                {% else %}
+                                    <input type="text" name="container_number[]" 
+                                        value="{{ con.container_number or '' }}" 
+                                        placeholder="Ввести номер"
+                                        class="border-blue-300 border rounded p-1 w-full focus:ring-blue-500">
+                                {% endif %}
+                            </td>
+                            <td class="p-2">
+                                {# ПИН нужен ТОЛЬКО если это COC И клиент везет сам #}
+                                {% if not con.is_soc and not order.pre_carriage_required %}
+                                    <input type="text" name="pin_code[]" 
+                                        value="{{ con.pin_code or '' }}" 
+                                        placeholder="ПИН-код для {{ order.pre_carriage_carrier }}"
+                                        class="border-orange-400 bg-orange-50 border rounded p-1 w-full font-bold text-orange-700">
+                                {% else %}
+                                    <div class="text-[10px] text-gray-400 italic px-2">
+                                        {% if con.is_soc %} Не требуется (SOC)
+                                        {% else %} Не требуется (Наша доставка) {% endif %}
+                                    </div>
+                                    {# Скрытое пустое поле, чтобы сохранить длину массива в POST #}
+                                    <input type="hidden" name="pin_code[]" value="">
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Блок: Автодоставка -->
+        
+        {% if order.pre_carriage_required == False and order.pre_carriage_carrier %}
+        <div class="bg-orange-50 border-2 border-orange-200 p-4 rounded-xl">
+            <h3 class="font-bold text-orange-800 mb-2 italic">⚠️ Требуется разнарядка для своего вывоза</h3>
+            <p class="text-sm">Клиент заберет порожний своей машиной. Перевозчик: <span class="font-black underline">{{ order.pre_carriage_carrier }}</span></p>
+            <p class="text-xs mt-2 text-orange-600">После ввода ПИН-кода выше, клиент увидит его в своем кабинете.</p>
+        </div>
+        {% endif %}
+
+        <div class="flex justify-end gap-4">
+            <button type="submit" name="action" value="save" class="px-6 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition font-bold">
+                Сохранить черновик
+            </button>
+            <button type="submit" name="action" value="confirm" class="px-8 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-bold shadow-lg">
+                ПОДТВЕРДИТЬ И ЗАПУСТИТЬ
+            </button>
+        </div>
+    </form>
+</div>

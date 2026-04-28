@@ -1,50 +1,25 @@
-<div class="max-w-2xl mx-auto py-12 text-center">
-    <!-- Иконка успеха с анимацией -->
-    <div class="mb-6 flex justify-center">
-        <div class="rounded-full bg-green-100 p-4 animate-bounce">
-            <svg class="h-12 w-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-        </div>
+<div class="max-w-2xl mx-auto text-center py-12 px-4 bg-white shadow-xl rounded-2xl border border-green-100">
+    <div class="mb-6 inline-flex items-center justify-center w-20 h-20 bg-green-100 text-green-600 rounded-full">
+        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
     </div>
-
-    <h2 class="text-3xl font-extrabold text-gray-900 mb-2">Поручение оформлено!</h2>
-    <p class="text-lg text-gray-600 mb-8">
-        Заказ <span class="font-mono font-bold text-indigo-600">#{{ order_id }}</span> успешно сохранен в системе и готов к работе.
+    
+    <h2 class="text-3xl font-bold text-gray-900 mb-4">Заказ #{{ order_id }} отправлен!</h2>
+    <p class="text-gray-600 mb-8 text-lg">
+        Ваша заявка успешно принята в работу. <br>
+        Оператор проверит данные и свяжется с вами в ближайшее время.
     </p>
 
-    <!-- Карточка с быстрой инфой -->
-    <div class="bg-gray-50 rounded-xl p-6 mb-10 border border-gray-100 text-left">
-        <h4 class="text-xs uppercase font-bold text-gray-400 mb-4 tracking-widest">Краткая информация:</h4>
-        <div class="grid grid-cols-2 gap-4 text-sm">
-            <div>
-                <p class="text-gray-500">Тип перевозки</p>
-                <p class="font-semibold text-gray-800">
-                    {% if order.transport_type.value|lower == 'container' %}📦 Контейнерная{% else %}🏗️ Генгруз{% endif %}
-                </p>
-            </div>
-            <div>
-                <p class="text-gray-500">Маршрут</p>
-                <p class="font-semibold text-gray-800">
-                    {{ order.port_of_loading.name if order.port_of_loading else '???' }} → {{ order.port_of_discharge.name if order.port_of_discharge else '???' }}
-                </p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Кнопки действий -->
-    <div class="flex flex-col sm:flex-row justify-center gap-4">
-        <button hx-get="/api/orders" 
-                hx-target="#main-content" 
-                hx-push-url="/orders"
-                class="px-8 py-3 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition shadow-lg">
-            В список заказов
+    <div class="space-y-3">
+        <button hx-get="/api/orders" hx-target="main" 
+                class="w-full sm:w-auto px-8 py-3 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition shadow-lg">
+            Вернуться в мои заказы
         </button>
-        
-        <button hx-post="/api/orders" 
-                hx-target="#main-content"
-                class="px-8 py-3 bg-white text-gray-700 border border-gray-300 rounded-lg font-bold hover:bg-gray-50 transition">
-            Создать еще одну
+        <br>
+        <button hx-get="/api/orders/new" hx-target="main" 
+                class="text-indigo-600 font-medium hover:underline">
+            Создать еще одну заявку
         </button>
     </div>
 </div>
