@@ -1,3 +1,14 @@
+<style>
+    /* Все ячейки в строке с классом .cancelled-row будут зачеркнуты */
+    tr.cancelled-row td {
+        text-decoration: line-through;
+        color: #9ca3af !important; /* серый цвет Tailwind gray-400 */
+    }
+    /* Убираем зачеркивание с кнопки/статуса, если нужно, чтобы текст "Отмена" читался четко */
+    tr.cancelled-row td.actions-cell {
+        text-decoration: none;
+    }
+</style>
 <div class="max-w-5xl mx-auto space-y-6">
     <div class="flex items-center justify-between bg-white p-4 rounded-lg shadow-sm border border-gray-200">
         <button hx-get="/api/operator/dashboard" hx-target="#main-content" class="text-blue-600 hover:underline">
@@ -17,21 +28,48 @@
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="text-gray-500 border-b">
-                            <th class="p-2 text-left">Тип</th>
+                            <th class="p-2 text-left">Тип / Специфика</th> <!-- Добавили "Специфика" -->
                             <th class="p-2 text-left">Собственность</th>
                             <th class="p-2 text-left">Номер контейнера</th>
-                            <th class="p-2 text-left">ПИН на выдачу (для клиента)</th>
+                            <th class="p-2 text-left">ПИН на выдачу</th>
+                            <th class="p-2 text-left">Пломба</th>
+                            <th class="p-2 text-center text-gray-400"><i class="fas fa-cog"></i></th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for con in order.containers %}
-                        <tr class="border-b">
-                            <td class="p-2 font-bold">{{ con.equipment.name }}</td>
+                        <!--tr class="border-b align-top"-->
+                        <!--tr id="con-row-{{ con.id }}" class="border-b {{ 'bg-gray-100 opacity-100 line-through text-gray-400' if con.is_cancelled }}">
+                            <td class="p-2">
+                                <div class="font-bold">{{ con.equipment.name }}</div>
+                                
+
+                                {% if con.temperature is not none or con.ventilation %}
+                                <div class="mt-1 p-1.5 bg-blue-50 rounded border border-blue-100 text-[10px] space-y-1">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-blue-700 font-bold uppercase">t°C:</span>
+                                        <span class="text-blue-900">{{ con.temperature if con.temperature is not none else '—' }}</span>
+                                    </div>
+                                    {% if con.ventilation %}
+                                        <div class="text-blue-700 font-bold">ВЕНТИЛЯЦИЯ: <span class="text-green-600">ВКЛ</span></div>
+                                    {% endif %}
+                                    {% if con.port_plug or con.vessel_plug %}
+                                        <div class="text-blue-700 font-bold uppercase">Подкл: 
+                                            <span class="text-gray-600 font-normal">
+                                                {{ 'Порт' if con.port_plug }} {{ 'Судно' if con.vessel_plug }}
+                                            </span>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </td>
+                            
                             <td class="p-2">
                                 <span class="{{ 'text-purple-600' if con.is_soc else 'text-blue-600' }}">
                                     {{ 'SOC' if con.is_soc else 'COC' }}
                                 </span>
                             </td>
+                            
                             <td class="p-2">
                                 <input type="hidden" name="container_id[]" value="{{ con.id }}">
                                 {% if con.is_soc %}
@@ -39,24 +77,96 @@
                                 {% else %}
                                     <input type="text" name="container_number[]" 
                                         value="{{ con.container_number or '' }}" 
-                                        placeholder="Ввести номер"
                                         class="border-blue-300 border rounded p-1 w-full focus:ring-blue-500">
                                 {% endif %}
                             </td>
+                            
                             <td class="p-2">
-                                {# ПИН нужен ТОЛЬКО если это COC И клиент везет сам #}
                                 {% if not con.is_soc and not order.pre_carriage_required %}
                                     <input type="text" name="pin_code[]" 
                                         value="{{ con.pin_code or '' }}" 
-                                        placeholder="ПИН-код для {{ order.pre_carriage_carrier }}"
-                                        class="border-orange-400 bg-orange-50 border rounded p-1 w-full font-bold text-orange-700">
+                                        class="border-orange-400 bg-orange-50 border rounded p-1 w-full font-bold">
                                 {% else %}
-                                    <div class="text-[10px] text-gray-400 italic px-2">
-                                        {% if con.is_soc %} Не требуется (SOC)
-                                        {% else %} Не требуется (Наша доставка) {% endif %}
-                                    </div>
-                                    {# Скрытое пустое поле, чтобы сохранить длину массива в POST #}
+                                    <div class="text-[10px] text-gray-400 italic px-2">Не требуется</div>
                                     <input type="hidden" name="pin_code[]" value="">
+                                {% endif %}
+                            </td>
+                            <td class="p-2">
+                                <div class="font-bold">{{ con.seal }}</div>
+                            </td>
+                            <td class="p-2 text-center">
+                                {% if not con.is_cancelled %}
+                                <button 
+                                    type="button"
+                                    hx-patch="/api/operator/containers/{{ con.id }}/cancel"
+                                    hx-confirm="Аннулировать этот контейнер?"
+                                    hx-target="closest tr"
+                                    hx-swap="outerHTML"
+                                    class="text-red-400 hover:text-red-600 transition p-1"
+                                    title="Аннулировать">
+                                    <svg xmlns="http://w3.org" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr-->
+                        <tr class="border-b {{ 'cancelled-row bg-gray-50' if con.is_cancelled }}">
+                            <td class="p-2">
+                                <div class="font-bold">{{ con.equipment.name }}</div>
+                                    {% if con.temperature is not none or con.ventilation %}
+                                        <div class="mt-1 p-1.5 bg-blue-50 rounded border border-blue-100 text-[10px] space-y-1">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-blue-700 font-bold uppercase">t°C:</span>
+                                                <span class="text-blue-900">{{ con.temperature if con.temperature is not none else '—' }}</span>
+                                            </div>
+                                            {% if con.ventilation %}
+                                                <div class="text-blue-700 font-bold">ВЕНТИЛЯЦИЯ: <span class="text-green-600">ВКЛ</span></div>
+                                            {% endif %}
+                                            {% if con.port_plug or con.vessel_plug %}
+                                                <div class="text-blue-700 font-bold uppercase">Подкл: 
+                                                    <span class="text-gray-600 font-normal">
+                                                        {{ 'Порт' if con.port_plug }} {{ 'Судно' if con.vessel_plug }}
+                                                    </span>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td class="p-2">
+                                <span class="{{ 'text-purple-600' if con.is_soc else 'text-blue-600' }}">
+                                    {{ 'SOC' if con.is_soc else 'COC' }}
+                                </span>
+                            </td>
+                            <td class="p-2">
+                                <input type="hidden" name="container_id[]" value="{{ con.id }}">
+                                <input type="text" name="container_number[]" 
+                                    value="{{ con.container_number or '' }}" 
+                                    {% if con.is_cancelled %} readonly {% endif %}
+                                    class="p-1 w-full border rounded {{ 'bg-transparent border-transparent text-gray-400 pointer-events-none' if con.is_cancelled else 'border-blue-300' }}">
+                            </td>
+                            
+                            <td class="p-2">
+                                <input type="text" name="pin_code[]" 
+                                    value="{{ con.pin_code or '' }}" 
+                                    {% if con.is_cancelled %} readonly {% endif %}
+                                    class="p-1 w-full border rounded font-bold {{ 'bg-transparent border-transparent text-gray-400 pointer-events-none' if con.is_cancelled else 'border-orange-400 bg-orange-50' }}">
+                            </td>
+                            <td class="p-2 min-w-[150px]">
+                                <div class="font-bold">{{ con.seal }}</div>
+                            </td>
+                            <td class="p-2 text-center" id="actions-{{ con.id }}">
+                                {% if not con.is_cancelled %}
+                                    <button type="button" 
+                                            hx-get="/api/operator/containers/{{ con.id }}/cancel-form" 
+                                            hx-target="#actions-{{ con.id }}"
+                                            class="text-red-500 text-xs font-bold hover:underline">
+                                        АННУЛИРОВАТЬ
+                                    </button>
+                                {% else %}
+                                    <span class="text-red-600 font-black text-[10px] uppercase">Отменено</span>
+                                    <div class="text-[9px] text-gray-400 italic">{{ con.cancel_reason or '' }}</div>
                                 {% endif %}
                             </td>
                         </tr>

@@ -7,9 +7,11 @@
                 <thead>
                     <tr class="bg-gray-50 text-gray-600 uppercase text-xs">
                         <th class="p-3 border-b">Тип eq.</th>
-                        <th class="p-3 border-b text-center">SOC</th>
-                        <th class="p-3 border-b">Номер контейнера</th>
-                        <th class="p-3 border-b">Пломба</th>
+                        <!--th class="p-3 border-b text-center">SOC</th-->
+                        {% if order.is_soc %}
+                            <th class="p-3 border-b">Номер контейнера</th>
+                            <th class="p-3 border-b">Пломба</th>
+                        {% endif %}
                         <th class="p-3 border-b">Вес (кг)</th>
                         <th class="p-3 border-b">Мест</th>
                         <th class="p-3 border-b">Груз</th>

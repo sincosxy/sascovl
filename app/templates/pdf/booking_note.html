@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        @font-face {
+            font-family: 'DejaVu';
+            src: url('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf');
+        }
+
+        @page { 
+            size: A4; 
+            margin: 1cm; 
+        }
+
+        body { 
+            font-family: 'DejaVu', sans-serif; /* Используем наш шрифт */
+            font-size: 10pt; 
+            color: #333; 
+        }
+
+        .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        .table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .table th, .table td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        .table th { background-color: #f0f0f0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>BOOKING NOTE #{{ order.id }}</h1>
+        <p>Дата оформления: {{ order.updated_at.strftime('%d.%m.%Y') }}</p>
+    </div>
+
+    <div class="section">
+        <table class="table">
+            <tr>
+                <td><strong>ОТПРАВИТЕЛЬ:</strong><br>{{ order.shipper.name }}</td>
+                <td><strong>ПОЛУЧАТЕЛЬ:</strong><br>{{ order.consignee.name }}</td>
+            </tr>
+            <tr>
+                <td><strong>ПОРТ ПОГРУЗКИ:</strong><br>{{ order.port_of_loading.name }}</td>
+                <td><strong>ПОРТ ВЫГРУЗКИ:</strong><br>{{ order.port_of_discharge.name }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="section">
+        <h3>СПЕЦИФИКАЦИЯ ОБОРУДОВАНИЯ</h3>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Тип</th>
+                    <th>Номер контейнера</th>
+                    <th>Собственность</th>
+                    <th>ПИН-код</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for con in order.containers %}
+                <tr>
+                    <td>{{ con.equipment.name }}</td>
+                    <td>{{ con.container_number or 'PENDING' }}</td>
+                    <td>{{ 'SOC' if con.is_soc else 'COC' }}</td>
+                    <td>{{ con.pin_code or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="footer">
+        <p>Документ сформирован автоматически в системе CargoFlow.</p>
+    </div>
+</body>
+</html>

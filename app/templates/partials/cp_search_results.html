@@ -1,0 +1,15 @@
+<div class="absolute z-50 w-full bg-white border shadow-xl rounded-md mt-1">
+    {% for cp in cps %}
+    <div class="p-2 hover:bg-blue-50 cursor-pointer border-b last:border-0"
+         hx-on:click="
+            let row = this.closest('.cp-group');
+            row.querySelector('[name$=_name]').value = '{{ cp.name }}';
+            row.querySelector('[name$=_inn]').value = '{{ cp.inn or '' }}';
+            row.querySelector('[name$=_address]').value = '{{ cp.address or '' }}';
+            row.querySelector('[name$=_contact]').value = '{{ cp.contact_info or '' }}';
+            this.parentElement.remove();">
+        <div class="font-bold text-sm">{{ cp.name }}</div>
+        <div class="text-[10px] text-gray-500">ИНН: {{ cp.inn or '—' }}</div>
+    </div>
+    {% endfor %}
+</div>

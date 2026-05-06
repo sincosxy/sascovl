@@ -2,7 +2,8 @@
     <h2 class="text-xl font-bold mb-4 text-gray-800">Шаг 1: Тип перевозки</h2>
     <p class="text-sm text-gray-500 mb-6">Заказ №{{ order_id }}</p>
     {% include 'partials/wizard_nav.html' %}
-    <form hx-patch="/api/orders/{{ order_id }}/step-1" hx-target="#main-content" class="space-y-6" novalidate>
+    <!--form hx-patch="/api/orders/{{ order_id }}/step-1" hx-target="#main-content" class="space-y-6" novalidate-->
+    <form hx-post="/api/orders/{{ order_id }}/check-type" hx-target="#main-content" class="space-y-6">
         <div class="grid grid-cols-2 gap-4">
             <!-- Вариант: Контейнер -->
             <label class="relative border-2 border-gray-200 rounded-xl p-4 cursor-pointer hover:border-blue-500 transition has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50">

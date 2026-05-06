@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Enum, ForeignKey, Float, Boolean
 from sqlalchemy.orm import relationship
 from app.db import Base
 import enum
+from sqlalchemy.sql import func
 
 class UserRole(enum.Enum):
     USER = "user"
@@ -11,10 +12,32 @@ class UserRole(enum.Enum):
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True)
+    company_id = Column(Integer, ForeignKey("companies.id"))
     email = Column(String, unique=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     role = Column(Enum(UserRole), default=UserRole.USER)
     orders = relationship("CargoOrder", back_populates="owner")
+    company = relationship("Company")
+
+class Company(Base):
+    __tablename__ = "companies"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    fullname = Column(String, index=True)
+    inn = Column(String, unique=True, index=True, nullable=True) # ИНН может не быть у иноземцев
+    kpp = Column(String, unique=False, nullable=True)
+    ogrn = Column(String, unique=False, nullable=True)
+    address1 = Column(String, unique=False, nullable=True)
+    address2 = Column(String, unique=False, nullable=True)
+    tel1 = Column(String, unique=False, nullable=True)
+    tel2 = Column(String, unique=False, nullable=True)
+    email1 = Column(String, unique=False, nullable=True)
+    email2 = Column(String, unique=False, nullable=True)
+    bik = Column(String, unique=False, nullable=True)
+    ks = Column(String, unique=False, nullable=True)
+    rs = Column(String, unique=False, nullable=True)
+
+
 
 class TransportType(enum.Enum):
     CONTAINER = "container"
@@ -36,6 +59,8 @@ class Counterparty(Base):
     inn = Column(String, nullable=True)
     address = Column(String, nullable=True)
     contact_info = Column(String, nullable=True)
+    last_use = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    use_count = Column(Integer, default=1)
 
     user = relationship("User")
 
@@ -45,6 +70,12 @@ class CargoOrder(Base):
     owner_id = Column(Integer, ForeignKey("users.id"))
     status = Column(String, default="draft")
     transport_type = Column(Enum(TransportType))
+    is_soc = Column(Boolean, nullable=True, default=None)
+    needs_return = Column(Boolean, nullable=True, default=None)
+    return_instructions = Column(String, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
 
     shipper_id = Column(Integer, ForeignKey("counterparties.id"))
     consignee_id = Column(Integer, ForeignKey("counterparties.id"))
@@ -101,6 +132,10 @@ class Container(Base):
     container_number = Column(String, nullable=True)
     seal = Column(String, nullable=True)
     pin_code = Column(String, nullable=True)
+    is_cancelled = Column(Boolean, default=False)
+    cancelled_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    cancelled_at = Column(DateTime, nullable=True)
+    cancel_reason = Column(String, nullable=True)
 
     # --- поля для Рефов ---
     temperature = Column(Float, nullable=True)

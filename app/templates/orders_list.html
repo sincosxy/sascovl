@@ -38,7 +38,8 @@
                                 <div class="flex items-center text-sm mt-1">
                                     {% if order.transport_type.value|lower == 'container' %}
                                         <span title="Контейнерная перевозка" class="mr-1">📦</span>
-                                        <span class="text-gray-500 text-xs uppercase tracking-wider">Контейнер</span>
+                                        <span class="text-gray-500 text-xs uppercase tracking-wider">Контейнер / </span>
+                                        <span class="text-gray-500 text-xs uppercase tracking-wider">{{ ' SOC' if order.is_soc == True else ' COC' }}</span>
                                     {% elif order.transport_type.value|lower == 'general' or order.transport_type.value|lower == 'general_cargo' %}
                                         <span title="Генеральный груз" class="mr-1">🏗️</span>
                                         <span class="text-gray-500 text-xs uppercase tracking-wider">Генгруз</span>

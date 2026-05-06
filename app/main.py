@@ -4,13 +4,17 @@ from app.db import engine, Base, get_db
 from sqlalchemy import select, delete  
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
-from app.models import User, Counterparty, CargoOrder, UserRole, Port, TransportType, Equipment, Container
+from app.models import User, Counterparty, CargoOrder, UserRole, Port, TransportType, Equipment, Container, Company
 from app.auth import verify_password, create_access_token, get_current_user, hash_password 
 from app.schemas import Token, UserLogin, CounterpartyCreate, CounterpartyRead, OrderRead, UserCreate
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
 from typing import List
 from datetime import datetime
+
+from xhtml2pdf import pisa
+from io import BytesIO
+
 
 templates = Jinja2Templates(directory="app/templates")
 
@@ -87,10 +91,13 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)): #cur
         if current_user.role != UserRole.ADMIN:
             return RedirectResponse(url="/", status_code=303)
 
+        result = await db.execute(select(Company))
+        companies = result.scalars().all()
+
         return templates.TemplateResponse(
             request=request,
             name="admin.html",
-            context={"user": current_user}
+            context={"user": current_user, "companies": companies}
         )
     except HTTPException:
         return RedirectResponse(url="/login", status_code=303)
@@ -156,6 +163,32 @@ async def get_or_create_counterparty(
     await db.refresh(new_party)
     return new_party
 
+
+async def sync_counterparty(db, user_id, name, inn, address, contact):
+    if not name or not name.strip(): return None
+    
+    name = name.strip()
+    # Ищем существующего
+    query = select(Counterparty).where(Counterparty.user_id == user_id, Counterparty.name.ilike(name))
+    res = await db.execute(query)
+    cp = res.scalars().first()
+
+    if cp:
+        # Обновляем данные, если клиент их подправил в форме
+        cp.inn = inn
+        cp.address = address
+        cp.contact_info = contact
+        cp.use_count += 1
+    else:
+        # Создаем нового
+        cp = Counterparty(user_id=user_id, name=name, inn=inn, address=address, contact_info=contact)
+        db.add(cp)
+    
+    await db.flush()
+    return cp.id
+
+
+
 @app.get("/api/counterparties/search") #, response_model=list[CounterpartyRead])
 async def search_counterparties(
     request: Request, #q: str,
@@ -179,59 +212,104 @@ async def search_counterparties(
     print(cps)
     options = "".join([f'<option value="{cp.name}">' for cp in cps])
     return HTMLResponse(content=options)
-    #query = select(Counterparty).where(
-    #    Counterparty.user_id == current_user.id,
-    #    Counterparty.name.ilike(f"%{q}%")
-    #).limit(5) # Отдаем топ-5 совпадений
-    #result = await db.execute(query)
-    #return result.scalars().all()
 
-@app.post("/api/orders2")
-async def create_order(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    # Теперь CargoOrder будет виден благодаря импорту выше
-    new_order = CargoOrder(owner_id=current_user.id, status="draft")
-    db.add(new_order)
-    await db.commit()
-    await db.refresh(new_order)
+
+@app.get("/api/search/counterparty")
+async def search_cp(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    search_query = next(iter(request.query_params.values()), "")
+    query = select(Counterparty).where(Counterparty.user_id == current_user.id)
+
+    if search_query:
+        query = query.where(Counterparty.name.ilike(f"%{search_query}%"))
+        # При обычном поиске тоже полезно сортировать по частоте
+        query = query.order_by(Counterparty.use_count.desc())
+    else:
+        # При клике на пустое поле — топ по частоте и дате
+        query = query.order_by(Counterparty.use_count.desc(), Counterparty.last_use.desc())
     
-    # Возвращаем пока JSON для проверки, что 404 и NameError ушли
-    #return {"id": new_order.id, "status": new_order.status}
-    return templates.TemplateResponse(
-        request=request, 
-        name="partials/step_1.html", 
-        context={"order_id": new_order.id}
-    )
+    result = await db.execute(query.limit(5))
+    
+    cps = result.scalars().all()
+    print(cps)
+    # Возвращаем список, который при клике заполнит поля через hx-on
+    return templates.TemplateResponse(request=request, name = "partials/cp_search_results.html", context={"cps": cps})
+
 
 @app.post("/api/orders")
-async def start_order(
+async def start_order(request: Request):
+    # Теперь этот эндпоинт просто отдает форму с правилами
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/step_0_rules.html",
+        context={}
+    )
+
+@app.post("/api/orders/init")
+async def init_order(
     request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # 1. Создаем пустой заказ (черновик)
-    new_order = CargoOrder(owner_id=current_user.id, transport_type="CONTAINER")
+    form_data = await request.form()
+    
+    # Юридическая проверка
+    if form_data.get("restricted_items") != "no":
+        return HTMLResponse("Перевозка запрещена", status_code=403)
+
+    # Вот теперь создаем пустой заказ в БД
+    new_order = CargoOrder(owner_id=current_user.id, transport_type="CONTAINER", status="draft")
     db.add(new_order)
     await db.commit()
     await db.refresh(new_order)
 
-    # 2. Сразу вызываем функцию отрисовки первого шага
-    # Важно: hx-target в кнопке index.html был #wizard-container, 
-    # убедись что в step_1.html форма тоже будет работать внутри него
+    # Возвращаем Шаг 1 (как раньше делал start_order)
     return templates.TemplateResponse(
         request=request,
         name="partials/step_1.html",
-        context={"order_id": new_order.id, "order": new_order,}
+        context={"order_id": new_order.id, "order": new_order, "current_step": "step-1"}
     )
+    
+@app.post("/api/orders/{order_id}/check-type")
+async def check_type(
+    request: Request,
+    order_id: int,
+    transport_type: str = Form(...),
+    db: AsyncSession = Depends(get_db)
+):
+    # 1. Достаем заказ в самом начале функции
+    result = await db.execute(select(CargoOrder).where(CargoOrder.id == order_id))
+    order = result.scalars().first()
+    
+    # Защита: если вдруг заказа нет
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+
+    # 2. Теперь переменная 'order' точно существует и доступна ниже
+    if transport_type == "container":
+        return templates.TemplateResponse(
+            request=request,
+            name="partials/step_1_soc_selection.html", 
+            context={
+                "order_id": order_id, 
+                "transport_type": transport_type, 
+                "order": order  # Теперь ошибки UnboundLocalError не будет
+            }
+        )
+    
+    # Логика для генгруза
+    order.transport_type = "general_cargo"
+    await db.commit()
+    # Здесь вызывай свой переход на следующий шаг (Маршрут/Контакты)
+    return await get_step_2_route(request, order_id, db)
 
 @app.patch("/api/orders/{order_id}/step-1")
 async def save_step_1(
     order_id: int,
     request: Request,
     transport_type: str = Form(...), 
+    is_soc: bool = Form(False),
+    needs_return: bool = Form(False),
+    return_instructions: str = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -252,6 +330,8 @@ async def save_step_1(
 
     # 2. Обновляем тип
     order.transport_type = transport_type.upper()
+    order.is_soc = is_soc
+    order.return_instructions = return_instructions if is_soc else None
     await db.commit()
     await db.refresh(order)
 
@@ -260,15 +340,18 @@ async def save_step_1(
     ports = ports_result.scalars().all()
 
     # 4. Возвращаем ответ
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request=request,
         name="partials/step_2.html",
         context={
             "order": order, # Теперь shipper/consignee внутри него загружены
             "order_id": order_id, 
-            "ports": ports
+            "ports": ports,
+            "current_step": "step-2"
         }
     )
+    #response.headers["HX-Push-Url"] = f"/api/orders/{order_id}/step-2"
+    return response
 
 # Вспомогательная функция для "умного" поиска/создания
 async def get_or_create_counterparty(name: str, user_id: int, db: AsyncSession):
@@ -316,9 +399,20 @@ async def save_step_2(
         raise HTTPException(status_code=404)
 
     # 2. Обрабатываем контрагентов
-    order.shipper_id = await get_or_create_counterparty(shipper_name, current_user.id, db)
-    order.consignee_id = await get_or_create_counterparty(consignee_name, current_user.id, db)
-    order.notify_party_id = await get_or_create_counterparty(notify_name, current_user.id, db)
+    #order.shipper_id = await get_or_create_counterparty(shipper_name, current_user.id, db)
+    #order.consignee_id = await get_or_create_counterparty(consignee_name, current_user.id, db)
+    #order.notify_party_id = await get_or_create_counterparty(notify_name, current_user.id, db)
+    form = await request.form()
+    order.shipper_id = await sync_counterparty(db, current_user.id, 
+        form.get("shipper_name"), form.get("shipper_inn"), 
+        form.get("shipper_address"), form.get("shipper_contact"))
+    order.consignee_id = await sync_counterparty(db, current_user.id, 
+        form.get("consignee_name"), form.get("consignee_inn"), 
+        form.get("consignee_address"), form.get("consignee_contact"))
+    order.notify_party_id = await sync_counterparty(db, current_user.id, 
+        form.get("notify_party_name"), form.get("notify_party_inn"), 
+        form.get("notify_party_address"), form.get("notify_party_contact"))
+
 
     # 3. Сохраняем порты
     order.pol_id = pol_id
@@ -337,29 +431,37 @@ async def save_step_2(
         eq_result = await db.execute(select(Equipment))
         equipments = eq_result.scalars().all()
 
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request=request,
         name=template_name,
         context={
             "order_id": order_id, 
             "order": order,       # Теперь внутри загружены containers
-            "equipments": equipments
+            "equipments": equipments,
+            "current_step": "step-3"
         }
     )
+    #response.headers["HX-Push-Url"] = f"/api/orders/{order_id}/step-2"
+    return response
 
 @app.get("/api/orders/{order_id}/add-container-row")
-async def add_container_row(request: Request, index: int = 0, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def add_container_row(request: Request, order_id: int, index: int = 0, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     # Теперь index берется из JS-параметра кнопки
     eq_res = await db.execute(select(Equipment))
     equipments = eq_res.scalars().all()
-    
+    order_res = await db.execute(select(CargoOrder).where(CargoOrder.id == order_id))
+    order = order_res.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404)
+
     return templates.TemplateResponse(
         request=request,
         name="partials/container_row.html", 
         context={
             "equipments": equipments, 
             "loop_index": index, # Передаем полученный индекс
-            "container": None
+            "container": None,
+            "order": order
         }
     )
 
@@ -414,7 +516,7 @@ async def save_step_3(
         new_con = Container(
             order_id=order_id,
             equipment_id=int(eq_ids[i]),
-            is_soc=row_marker in soc_indices,
+            is_soc=order.is_soc, #row_marker in soc_indices,
             container_number=get_val(numbers, i),
             seal=get_val(seals, i),
             weight_gross=float(get_val(weights, i)) if get_val(weights, i) else 0.0,
@@ -446,7 +548,7 @@ async def save_step_3(
     return templates.TemplateResponse(
         request=request,
         name="partials/step_4_trucking.html",#"partials/order_success.html",
-        context={"order_id": order_id, "order": order}
+        context={"order_id": order_id, "order": order, "current_step": "step-4"}
     )
 
 @app.patch("/api/orders/{order_id}/step-4")
@@ -775,7 +877,38 @@ async def operator_dashboard(
         response = RedirectResponse(url="/login", status_code=303)
         response.headers["HX-Redirect"] = "/login" # Заставит HTMX сделать полный редирект
         return response
+
+@app.patch("/api/orders/containers/{container_id}/update-seal")
+async def update_seal(
+    container_id: int, 
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    form_data = await request.form()
+    new_seal = form_data.get("seal")
+
+    # Ищем контейнер и проверяем, что заказ принадлежит пользователю
+    result = await db.execute(
+        select(Container).join(CargoOrder).where(
+            Container.id == container_id,
+            CargoOrder.owner_id == current_user.id
+        )
+    )
+    container = result.scalars().first()
     
+    if not container:
+        raise HTTPException(status_code=404)
+
+    # Здесь МЫ НЕ ПРОВЕРЯЕМ статус заказа на DRAFT, 
+    # так как пломбу можно вносить всегда до момента захода в порт
+    container.seal = new_seal.strip().upper() if new_seal else None
+    
+    await db.commit()
+    
+    # Возвращаем "Ок" или просто обновленное значение, чтобы HTMX успокоился
+    return Response(status_code=200)
+
 @app.get("/api/operator/orders/{order_id}/manage")
 async def manage_order(order_id: int, request: Request, db: AsyncSession = Depends(get_db)):
     # Загружаем всё, включая данные по автодоставке и перевозчикам
@@ -832,3 +965,85 @@ async def update_order_ops(
     # Редирект обратно в дашборд оператора
     #return Response(headers={"HX-Redirect": "/api/operator/dashboard"})
     return await operator_dashboard(request, db)
+
+
+@app.patch("/api/operator/containers/{container_id}/cancel")
+async def cancel_container(
+    container_id: int, 
+    request: Request,
+    reason: str = Form(None), # Получаем из hx-include
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    res = await db.execute(select(Container).where(Container.id == container_id))
+    con = res.scalars().first()
+    
+    if con:
+        con.is_cancelled = True
+        con.cancel_reason = reason
+        con.cancelled_at = datetime.now()
+        con.cancelled_by_id = current_user.id
+        await db.commit()
+    
+    # Перерисовываем всю страницу, как и раньше
+    return await manage_order(request=request, order_id=con.order_id, db=db)
+
+
+@app.get("/api/operator/containers/{container_id}/cancel-form")
+async def get_cancel_form(container_id: int):
+    return HTMLResponse(content=f"""
+        <div class="flex flex-col gap-1">
+            <input type="text" name="reason" id="reason-{container_id}" 
+                   placeholder="Причина..." 
+                   class="text-[10px] border border-red-300 rounded p-1 w-32 focus:outline-none">
+            <div class="flex gap-2 justify-center">
+                <button hx-patch="/api/operator/containers/{container_id}/cancel"
+                        hx-include="#reason-{container_id}"
+                        hx-target="#main-content"
+                        class="text-[10px] bg-red-600 text-white px-2 py-0.5 rounded">OK</button>
+                <button hx-get="/api/operator/dashboard" hx-target="#main-content" 
+                        class="text-[10px] text-gray-500">Отмена</button>
+            </div>
+        </div>
+    """)
+
+
+@app.get("/api/orders/{order_id}/pdf")
+async def generate_pdf(
+    order_id: int, 
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # 1. Загружаем данные (как для Summary)
+    result = await db.execute(
+        select(CargoOrder)
+        .options(
+            joinedload(CargoOrder.port_of_loading),
+            joinedload(CargoOrder.port_of_discharge),
+            joinedload(CargoOrder.shipper),
+            joinedload(CargoOrder.consignee),
+            selectinload(CargoOrder.containers).joinedload(Container.equipment)
+        )
+        .where(CargoOrder.id == order_id)
+    )
+    order = result.scalars().first()
+
+    # 2. Рендерим HTML через Jinja
+    html_content = templates.get_template("pdf/booking_note.html").render({"order": order})
+
+    # 3. Конвертируем HTML в PDF
+    pdf_buffer = BytesIO()
+    pisa_status = pisa.CreatePDF(BytesIO(html_content.encode("utf-8")), dest=pdf_buffer)
+
+    if pisa_status.err:
+        return Response(content="Ошибка генерации PDF", status_code=500)
+
+    # 4. Отдаем файл браузеру
+    pdf_buffer.seek(0)
+    return Response(
+        content=pdf_buffer.getvalue(),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=Booking_Note_{order_id}.pdf"
+        }
+    )

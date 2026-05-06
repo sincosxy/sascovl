@@ -7,7 +7,8 @@
     ] %}
 
     {% for path, num, label in steps %}
-        {% set is_active = request.url.path.endswith(path) %}
+        {# ПРОВЕРКА: Либо передан current_step, либо берем из URL #}
+        {% set is_active = (current_step == path) if current_step else request.url.path.endswith(path) %}
         
         <button hx-get="/api/orders/{{ order_id }}/{{ path }}" hx-target="#main-content"
                 class="flex items-center {{ 'text-blue-600' if is_active else 'text-gray-500 hover:text-blue-500' }}">

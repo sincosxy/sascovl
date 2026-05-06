@@ -36,7 +36,7 @@
                        placeholder="Начните вводить название компании..." 
                        class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 border">
             </div-->
-            <div class="form-group space-y-4 pt-2">
+            <!--div class="form-group space-y-4 pt-2">
                 <label class="block text-sm font-medium text-gray-700">Грузоотправитель (Shipper)</label>
                 <input type="text" required value="{{ order.shipper.name if order.shipper else ''}}"
                     name="shipper_name" 
@@ -49,11 +49,39 @@
                     class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 border">
                 
                 <datalist id="shipper-list">
-                    <!-- Сюда HTMX подставит <option> из поиска -->
+
                 </datalist>
+            </div-->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="cp-group relative">
+                    <label class="block text-xs font-bold text-gray-500 uppercase">Отправитель</label>
+                    <input type="text" name="shipper_name" autocomplete="off"
+                        hx-get="/api/search/counterparty" hx-trigger="keyup changed delay:300ms, focus" hx-target="next .results"
+                        value="{{ order.shipper.name if order.shipper else '' }}" class="w-full border rounded p-2">
+                    <div class="results"></div>
+                    
+                    <div class="grid grid-cols-2 gap-2 mt-2">
+                        <input type="text" name="shipper_inn" placeholder="ИНН" value="{{ order.shipper.inn or '' }}" class="text-xs border rounded p-1">
+                        <input type="text" name="shipper_contact" placeholder="Контакты" value="{{ order.shipper.contact_info or '' }}" class="text-xs border rounded p-1">
+                        <input type="text" name="shipper_address" placeholder="Адрес" value="{{ order.shipper.address or '' }}" class="col-span-2 text-xs border rounded p-1">
+                    </div>
+                </div>
+                <div class="cp-group relative">
+                    <label class="block text-xs font-bold text-gray-500 uppercase">Отправитель</label>
+                    <input type="text" name="consignee_name" autocomplete="off"
+                        hx-get="/api/search/counterparty" hx-trigger="keyup changed delay:300ms, focus" hx-target="next .results"
+                        value="{{ order.consignee.name if order.consignee else '' }}" class="w-full border rounded p-2">
+                    <div class="results"></div>
+                    
+                    <div class="grid grid-cols-2 gap-2 mt-2">
+                        <input type="text" name="consignee_inn" placeholder="ИНН" value="{{ order.consignee.inn or '' }}" class="text-xs border rounded p-1">
+                        <input type="text" name="consignee_contact" placeholder="Контакты" value="{{ order.consignee.contact_info or '' }}" class="text-xs border rounded p-1">
+                        <input type="text" name="consignee_address" placeholder="Адрес" value="{{ order.consignee.address or '' }}" class="col-span-2 text-xs border rounded p-1">
+                    </div>
+                </div>
             </div>
             
-            <div class="form-group space-y-4 pt-2">
+            <!--div class="form-group space-y-4 pt-2">
                 <label class="block text-sm font-medium text-gray-700">Грузополучатель (Consignee)</label>
                 <input type="text" name="consignee_name" required value="{{ order.consignee.name if order.consignee else ''}}"
                         placeholder="ИНН или Название..." 
@@ -64,9 +92,9 @@
                         autocomplete="off"
                         class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 border">
                 <datalist id="consignee-list">
-                    <!-- Сюда HTMX подставит <option> из поиска -->
+
                 </datalist>
-            </div>
+            </div-->
 
             <div class="form-group space-y-4 pt-2">
                 <label class="block text-sm font-medium text-gray-700">Уведомить (Notify Party)</label>
@@ -75,7 +103,7 @@
                         placeholder="Оставьте пустым, если совпадает с получателем" 
                         list="notify-list"
                         hx-get="/api/counterparties/search" 
-                        hx-trigger="keyup changed delay:300ms" 
+                        hx-trigger="keyup changed delay:300ms, focus" 
                         hx-target="#notify-list" 
                         autocomplete="off"
                         class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 border">
@@ -90,3 +118,11 @@
         </button>
     </form>
 </div>
+<script>
+    document.addEventListener('click', function (e) {
+    // Если кликнули не по результатам поиска и не по самому инпуту
+    if (!e.target.closest('.results') && !e.target.closest('input[hx-get]')) {
+        document.querySelectorAll('.results').forEach(el => el.innerHTML = '');
+    }
+});
+</script>

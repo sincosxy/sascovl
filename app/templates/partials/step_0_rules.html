@@ -1,0 +1,62 @@
+<div id="step-container" class="max-w-2xl mx-auto p-8 bg-white shadow-xl rounded-2xl border border-gray-100" 
+     x-data="{ restricted: '', agreed: false }">
+    
+    <div class="text-center mb-8">
+        <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 text-blue-600 rounded-full mb-4">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+        </div>
+        <h2 class="text-2xl font-bold text-gray-800">Декларация груза</h2>
+        <p class="text-gray-500">Перед началом оформления, подтвердите характер груза</p>
+    </div>
+
+    <form hx-post="/api/orders/init" hx-target="#main-content" class="space-y-6">
+        <!-- Блок правил -->
+        <div class="p-4 bg-gray-50 rounded-lg text-sm text-gray-600 border border-gray-200 h-40 overflow-y-auto">
+            <h3 class="font-bold mb-2">Условия перевозки:</h3>
+            <p>1. Отправитель гарантирует достоверность данных о весе и габаритах.</p>
+            <p>2. Груз должен быть упакован в соответствии с требованиями морской перевозки.</p>
+            <p>3. Нажимая кнопку «Продолжить», вы соглашаетесь с публичной офертой ООО СМП Владивосток.</p>
+            <p class="mt-2 text-red-600 font-medium">Запрещена перевозка наркотических средств, оружия, взрывчатых веществ и иных грузов, изъятых из гражданского оборота.</p>
+        </div>
+
+        <!-- Радиобоксы -->
+        <div class="space-y-4 pt-4">
+            <p class="text-sm font-bold text-gray-700">Наличие грузов, изъятых из гражданского оборота или ограниченно оборотоспособных:</p>
+            
+            <div class="flex flex-col gap-3">
+                <label class="flex items-center p-3 border rounded-lg cursor-pointer transition"
+                       :class="restricted === 'yes' ? 'border-red-500 bg-red-50' : 'hover:bg-gray-50'">
+                    <input type="radio" name="restricted_items" value="yes" x-model="restricted" class="w-4 h-4 text-blue-600">
+                    <span class="ml-3 text-sm font-medium">Да, такие грузы имеются</span>
+                </label>
+
+                <label class="flex items-center p-3 border rounded-lg cursor-pointer transition"
+                       :class="restricted === 'no' ? 'border-green-500 bg-green-50' : 'hover:bg-gray-50'">
+                    <input type="radio" name="restricted_items" value="no" x-model="restricted" class="w-4 h-4 text-blue-600">
+                    <span class="ml-3 text-sm font-medium">Нет, запрещенных грузов в партии нет</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Чекбокс согласия -->
+        <label class="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" x-model="agreed" class="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded">
+            <span class="text-xs text-gray-500 italic">Я подтверждаю, что ознакомлен с правилами перевозки и несу полную ответственность за предоставленные данные.</span>
+        </label>
+
+        <!-- Кнопка с условием -->
+        <div class="pt-4">
+            <button type="submit" 
+                    x-bind:disabled="restricted !== 'no' || !agreed"
+                    class="w-full py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg transition-all
+                           disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed hover:bg-blue-700">
+                Создать новую заявку
+            </button>
+            <p x-show="restricted === 'yes'" class="mt-3 text-xs text-center text-red-600 font-bold">
+                ⚠️ Перевозка данных грузов через сервис ООО СМП Владивосток запрещена.
+            </p>
+        </div>
+    </form>
+</div>

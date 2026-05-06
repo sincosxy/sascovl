@@ -18,14 +18,15 @@
             {% endfor %}
         </select>
     </td>
-    <td class="p-2 text-center">
+    <!--td class="p-2 text-center">
         <input type="checkbox" name="is_soc[]" onchange="toggleContainerInput(this)" value="{{ loop_index }}"
             {% if container and container.is_soc %}checked{% endif %}
             class="h-4 w-4 text-indigo-600 border-gray-300 rounded">
-    </td>
+    </td-->
+    {% if order.is_soc %}
     <td class="p-2">
         <input type="text" name="container_number[]" placeholder="AAAA0000000"
-            {% if not container or not container.is_soc %}readonly{% endif %}
+            {# {% if not container or not container.is_soc %}readonly{% endif %} #}
             class="w-full rounded-md border-gray-300 shadow-sm sm:text-sm disabled:bg-gray-100"
             value="{{ container.container_number if container else '' }}">
     </td>
@@ -33,6 +34,10 @@
         <input type="text" name="seal[]" placeholder="S12345" class="w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
             value="{{ container.seal if container else '' }}">
     </td>
+    {% else %}
+        <input type="hidden" name="container_number[]" value="">
+    {% endif %}
+
     <td class="p-2">
         <input type="number" step="0.01" name="weight_gross[]" placeholder="0.00" class="w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
             value="{{ container.weight_gross if container else '' }}">
