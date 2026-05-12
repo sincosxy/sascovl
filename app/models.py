@@ -13,6 +13,7 @@ class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True)
     company_id = Column(Integer, ForeignKey("companies.id"))
+    name = Column(String, unique=False, nullable=True)
     email = Column(String, unique=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     role = Column(Enum(UserRole), default=UserRole.USER)
@@ -130,6 +131,7 @@ class Container(Base):
     pieces = Column(Integer, nullable=False)
     cargo_description = Column(String)
     container_number = Column(String, nullable=True)
+    valid_number = Column(Boolean, default=True)
     seal = Column(String, nullable=True)
     pin_code = Column(String, nullable=True)
     is_cancelled = Column(Boolean, default=False)

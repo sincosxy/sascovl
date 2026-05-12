@@ -11,6 +11,7 @@
             <thead class="bg-gray-800 text-white">
                 <tr>
                     <th class="p-4 text-xs uppercase">Заказ</th>
+                    <th class="p-4 text-xs uppercase">Заказчик</th>
                     <th class="p-4 text-xs uppercase">Маршрут</th>
                     <th class="p-4 text-xs uppercase">Тип / Кол-во</th>
                     <th class="p-4 text-xs uppercase">Статус логистики</th>
@@ -21,9 +22,44 @@
             <tbody class="divide-y divide-gray-100">
                 {% for order in orders %}
                 <tr class="hover:bg-blue-50/50 transition">
+                <!--tr class="hover:bg-blue-50/50 transition cursor-pointer" onclick="toggleDetails({{ order.id }})"-->
+
+                    <td class="px-6 py-4">
+                        <div class="flex items-center space-x-3">
+                            <!-- Стрелочка -->
+                            <button class="text-gray-400 hover:text-indigo-600 transition-all duration-300"
+                                    id="btn-{{ order.id }}"
+                                    hx-get="/api/orders/{{ order.id }}/details"
+                                    hx-target="#details-{{ order.id }}"
+                                    onclick="toggleDetails('{{ order.id }}')">
+                                <svg id="icon-{{ order.id }}" class="w-5 h-5 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div class="font-bold text-blue-600">#{{ order.id }}</div>
+                            <div class="text-[10px] text-gray-400">{{ order.created_at }}</div>
+                        </div>
+                    </td>
                     <td class="p-4">
-                        <div class="font-bold text-blue-600">#{{ order.id }}</div>
-                        <div class="text-[10px] text-gray-400">{{ order.created_at }}</div>
+                        <div class="text-sm font-bold text-gray-700">
+                            {# Если у User есть поле full_name, используем его, иначе email #}
+                            {{ order.owner.full_name if order.owner.full_name else order.owner.email }}
+                        </div>
+                        
+                        {% if order.owner.company %}
+                            <div class="text-[10px] text-blue-600 font-medium">
+                                🏢 {{ order.owner.company.name }}
+                            </div>
+                        {% else %}
+                            <div class="text-[10px] text-gray-400">Физ. лицо</div>
+                        {% endif %}
+                        
+                        <!--div class="text-[10px] text-gray-500 mt-1">
+                            ID юзера: #{{ order.owner_id }}
+                        </div-->
+                        <div class="text-[10px] text-gray-500 mt-1">
+                            {{ order.owner.name if order.owner.name else order.owner.email }}
+                        </div>
                     </td>
                     <td class="p-4 text-sm">
                         <div class="flex items-center gap-2">
@@ -75,8 +111,48 @@
                         {% endif %}
                     </td>
                 </tr>
+                <!--tr id="details-row-{{ order.id }}">
+                    <td colspan="7" class="p-0">
+                        <div id="details-{{ order.id }}" 
+                            class="hidden bg-gray-50 border-l-4 border-indigo-500 shadow-inner overflow-hidden"
+                            hx-get="/api/operator/orders/{{ order.id }}/details" 
+                            hx-trigger="intersect once"
+                            hx-swap="innerHTML">
+                            <div class="p-4 flex justify-center">
+                                <span class="text-sm text-gray-500 animate-pulse">Загрузка данных...</span>
+                            </div>
+                        </div>
+                    </td>
+                </tr-->
+                <tr id="details-row-{{ order.id }}">
+                    <td colspan="6" class="p-0">
+                        <div id="details-{{ order.id }}" class="hidden bg-gray-50 border-l-4 border-blue-500 shadow-inner">
+                            <!-- Сюда прилетят данные -->
+                        </div>
+                    </td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+<script>
+function toggleDetails(orderId) {
+    const detailsDiv = document.getElementById('details-' + orderId);
+    const icon = document.getElementById('icon-' + orderId);
+    
+    // Если блок уже виден и в нем есть данные — скрываем его
+    if (!detailsDiv.classList.contains('hidden') && detailsDiv.innerHTML.trim() !== "") {
+        detailsDiv.classList.add('hidden');
+        icon.classList.remove('rotate-180');
+    } else {
+        // Иначе показываем (HTMX сам заполнит его данными)
+        detailsDiv.classList.remove('hidden');
+        icon.classList.add('rotate-180');
+    }
+}
+</script>
+
+<style>
+    .rotate-180 { transform: rotate(180deg); }
+</style>

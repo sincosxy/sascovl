@@ -139,12 +139,25 @@
                                     {{ 'SOC' if con.is_soc else 'COC' }}
                                 </span>
                             </td>
-                            <td class="p-2">
+                            <!--td class="p-2">
                                 <input type="hidden" name="container_id[]" value="{{ con.id }}">
                                 <input type="text" name="container_number[]" 
                                     value="{{ con.container_number or '' }}" 
                                     {% if con.is_cancelled %} readonly {% endif %}
                                     class="p-1 w-full border rounded {{ 'bg-transparent border-transparent text-gray-400 pointer-events-none' if con.is_cancelled else 'border-blue-300' }}">
+                            </td-->
+                            <td class="p-2">
+                                <input type="hidden" name="container_id[]" value="{{ con.id }}">
+                                <input type="text" name="container_number[]" 
+                                    value="{{ con.container_number or '' }}" 
+                                    {% if con.is_cancelled %} readonly {% endif %}
+                                    class="p-1 w-full border rounded 
+                                    {% if con.is_cancelled %}
+                                        bg-transparent border-transparent text-gray-400 pointer-events-none
+                                    {% else %}
+                                        {# Если не отменен, проверяем валидность #}
+                                        {{ 'border-red-500 text-red-600 bg-red-50' if con.valid_number == False else 'border-blue-300 text-gray-800' }}
+                                    {% endif %}">
                             </td>
                             
                             <td class="p-2">

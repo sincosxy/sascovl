@@ -168,7 +168,7 @@
                 </td>
                 <td class="p-2">
                     <!-- Номер контейнера -->
-                    <div class="font-mono text-gray-800">
+                    <div class="font-mono {{ 'text-red-600 font-bold' if con.valid_number == False else 'text-gray-800' }}">
                         {{ con.container_number or '<span class="text-gray-300 italic">Назначается</span>' | safe }}
                     </div>
                 </td>

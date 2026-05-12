@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Request, Response, Form
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm 
+from app.helpers import validate_container_number
 from app.db import engine, Base, get_db
 from sqlalchemy import select, delete  
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -109,6 +110,7 @@ async def admin_create_user(
     email: str = Form(...),
     password: str = Form(...),
     full_name: str = Form(None),
+    company_id: int = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -125,7 +127,9 @@ async def admin_create_user(
     new_user = User(
         email=email,
         hashed_password=hash_password(password),
-        role=UserRole.USER
+        role=UserRole.USER,
+        name=full_name,
+        company_id=company_id
     )
     db.add(new_user)
     await db.commit()
@@ -518,6 +522,7 @@ async def save_step_3(
             equipment_id=int(eq_ids[i]),
             is_soc=order.is_soc, #row_marker in soc_indices,
             container_number=get_val(numbers, i),
+            valid_number=validate_container_number(get_val(numbers, i)),
             seal=get_val(seals, i),
             weight_gross=float(get_val(weights, i)) if get_val(weights, i) else 0.0,
             pieces=int(get_val(pieces, i)) if get_val(pieces, i) else 0,
@@ -766,11 +771,18 @@ async def get_order_details(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    result = await db.execute(
-        select(CargoOrder)
-        .options(selectinload(CargoOrder.containers).joinedload(Container.equipment))
-        .where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
-    )
+    if current_user.role not in [UserRole.ADMIN, UserRole.OPERATOR]:
+        result = await db.execute(
+            select(CargoOrder)
+            .options(selectinload(CargoOrder.containers).joinedload(Container.equipment))
+            .where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
+        )
+    else:
+        result = await db.execute(
+            select(CargoOrder)
+            .options(selectinload(CargoOrder.containers).joinedload(Container.equipment))
+            .where(CargoOrder.id == order_id) #, CargoOrder.owner_id == current_user.id)
+        )
     order = result.scalars().first()
     
     # Возвращаем маленький паршиал со списком
@@ -861,7 +873,8 @@ async def operator_dashboard(
                 joinedload(CargoOrder.port_of_loading),
                 joinedload(CargoOrder.port_of_discharge),
                 # Добавляем загрузку оборудования для отображения в списке
-                selectinload(CargoOrder.containers).joinedload(Container.equipment)
+                selectinload(CargoOrder.containers).joinedload(Container.equipment),
+                joinedload(CargoOrder.owner).joinedload(User.company)
             )
             .where(CargoOrder.status != "draft")
             .order_by(CargoOrder.id.desc())
@@ -947,12 +960,23 @@ async def update_order_ops(
         result = await db.execute(select(Container).where(Container.id == con_id))
         container = result.scalar_one()
         
-        # Обновляем только если это COC (номера и пины)
-        if not container.is_soc:
-            # Номера могут приходить в меньшем количестве, если часть полей была readonly
+        # Обновляем только если это COC (номера и пины) отключил пока
+        #if not container.is_soc:
+        #    # Номера могут приходить в меньшем количестве, если часть полей была readonly
             # Но мы используем скрытые поля или фиксированные индексы
-            if i < len(numbers): container.container_number = numbers[i]
-            if i < len(pins): container.pin_code = pins[i]
+        #    if i < len(numbers):
+        #        container.container_number = numbers[i]
+        #        container.valid_number = validate_container_number(numbers[i])
+
+        #    if i < len(pins): container.pin_code = pins[i]
+        
+        # Обновляем
+
+        if i < len(numbers):
+            container.container_number = numbers[i]
+            container.valid_number = validate_container_number(numbers[i])
+
+        if i < len(pins): container.pin_code = pins[i]
 
     # Если нажата кнопка "Подтвердить и запустить"
     if action == "confirm":
