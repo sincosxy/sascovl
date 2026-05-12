@@ -1,0 +1,11 @@
+services:
+  db:
+    ports:
+      - "5432:5432"
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.unused
+    image: hello-world
+    entrypoint: ["/bin/sh", "-c", "echo 'App is disabled locally"]
+    command: ["echo", "running in venv, skipping..."]

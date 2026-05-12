@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     POSTGRES_DB: str
     PGADMIN_DEFAULT_EMAIL: str
     PGADMIN_DEFAULT_PASSWORD: str
+    DB_HOST: str = "localhost"
+    DB_PORT: int = 5432
     # Собираем URL для SQLAlchemy (asyncpg для асинхронности)
     DATABASE_URL: str | None = None
     SECRET_KEY: str
@@ -20,7 +22,14 @@ class Settings(BaseSettings):
     def assemble_db_connection(cls, v: str | None, info: Any) -> Any:
         if isinstance(v, str):
             return v
-        return f"postgresql+asyncpg://{info.data['POSTGRES_USER']}:{info.data['POSTGRES_PASSWORD']}@localhost:5432/{info.data['POSTGRES_DB']}"
+        data = info.data
+        user = data.get("POSTGRES_USER")
+        password = data.get("POSTGRES_PASSWORD")
+        host = data.get("DB_HOST")
+        port = data.get("DB_PORT")
+        db = data.get("POSTGRES_DB")
+        return f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{db}"
+        #return f"postgresql+asyncpg://{info.data['POSTGRES_USER']}:{info.data['POSTGRES_PASSWORD']}@localhost:5432/{info.data['POSTGRES_DB']}"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=True)
 
