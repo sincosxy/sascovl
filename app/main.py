@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from typing import List
 from datetime import datetime
 
-from xhtml2pdf import pisa
+#from xhtml2pdf import pisa
 from io import BytesIO
 
 
