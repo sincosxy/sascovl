@@ -36,6 +36,11 @@ async def home(request: Request, db: AsyncSession = Depends(get_db)):
     except HTTPException:
         return RedirectResponse(url="/login")
 
+@app.on_event("startup")
+async def startup():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
 @app.get("/1", response_class=HTMLResponse)
 async def home(request: Request, db: AsyncSession = Depends(get_db)):
     try:
