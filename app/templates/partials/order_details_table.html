@@ -1,35 +1,68 @@
-<div class="p-4 bg-gray-50 border-x border-b rounded-b-lg shadow-inner">
-    <div class="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-4">
+<div class="px-8 py-5 bg-slate-50/50 border-t border-slate-100/80 animate-fadeIn">
+    <div class="grid grid-cols-1 lg:grid-cols-[2.5fr_1fr] gap-8">
+        
         <!-- Список контейнеров -->
         <div>
-            <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">Грузовые места:</h4>
-            <ul class="space-y-2">
+            <h4 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                </svg>
+                Грузовые места
+            </h4>
+            
+            <ul class="space-y-2.5">
                 {% for con in order.containers %}
-                <li class="flex items-center justify-between bg-white p-2 rounded border border-gray-200 text-sm">
-                    <div class="flex items-center gap-3">
-                        <span class="font-bold text-gray-700">{{ con.equipment.name }}</span>
-                        <span class="font-mono {{ 'text-red-500' if con.valid_number == False else 'text-gray-500' }}">{{ con.container_number or 'Назначается' }}</span>
+                <li class="flex flex-col sm:flex-row sm:items-center justify-between bg-white px-4 py-3 rounded-xl border border-slate-200/60 shadow-sm hover:shadow-md transition-shadow gap-3">
+                    
+                    <!-- Левая часть: Имя и Номер (С проверкой валидности) -->
+                    <div class="flex items-center gap-3.5 min-w-0">
+                        <span class="text-sm font-semibold text-slate-800 shrink-0">{{ con.equipment.name }}</span>
+                        
+                        {% if con.container_number %}
+                            <!-- Если номер невалидный (valid_number == False), красим в красный -->
+                            <span class="font-mono text-xs px-2 py-0.5 rounded-md tracking-wider font-semibold 
+                                {{ 'text-rose-600 bg-rose-50 border border-rose-200/60' if con.valid_number == False else 'bg-slate-100 text-slate-600 border border-transparent' }}">
+                                {{ con.container_number }}
+                                {% if con.valid_number == False %}
+                                    <span class="text-[10px] ml-1 font-sans font-normal">(ошибка КС)</span>
+                                {% endif %}
+                            </span>
+                        {% else %}
+                            <span class="text-xs italic text-slate-400">Номер не назначен</span>
+                        {% endif %}
                     </div>
                     
-                    <div class="flex items-center gap-2">
-                        <!-- ПИН-код в аккордеоне -->
+                    <!-- Правая часть: Настройки, Пломба, ПИН -->
+                    <div class="flex items-center justify-end gap-4 shrink-0">
+                        <!-- ПИН-код -->
                         {% if con.pin_code and order.status == 'IN_PROGRESS' %}
-                            <span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-md text-[10px] font-black border border-orange-200">
+                            <span class="bg-amber-50 text-amber-700 px-2 py-1 rounded-md text-[10px] font-bold border border-amber-200 tracking-wide">
                                 PIN: {{ con.pin_code }}
                             </span>
                         {% endif %}
 
-                        <span class="text-xs text-gray-500">Пломба:</span>
-                        <input type="text" 
-                            name="seal" 
-                            value="{{ con.seal or '' }}" 
-                            placeholder="Введите №"
-                            hx-patch="/api/orders/containers/{{ con.id }}/update-seal"
-                            hx-trigger="keyup changed delay:1s"
-                            class="text-xs border-b border-dashed border-blue-300 focus:border-blue-500 outline-none bg-transparent w-24">
-                        <span class="htmx-indicator animate-spin">⏳</span>
+                        <!-- Блок ввода пломбы -->
+                        <div class="flex items-center gap-2 relative">
+                            <span class="text-xs font-medium text-slate-400">Пломба:</span>
+                            <input type="text" 
+                                name="seal" 
+                                value="{{ con.seal or '' }}" 
+                                placeholder="Введите №"
+                                hx-patch="/api/orders/containers/{{ con.id }}/update-seal"
+                                hx-trigger="keyup changed delay:1s"
+                                class="text-xs font-medium text-slate-700 border-b border-dashed border-slate-300 focus:border-indigo-500 focus:text-indigo-600 outline-none bg-transparent w-24 pb-0.5 transition-colors">
+                            
+                            <!-- Спиннер HTMX -->
+                            <div class="htmx-indicator absolute -right-5 top-1">
+                                <svg class="animate-spin h-3 w-3 text-indigo-600" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <circle class="opacity-75" fill="currentColor" cx="12" cy="12" r="10"></circle>
+                                </svg>
+                            </div>
+                        </div>
                         
-                        <span class="text-[10px] {{ 'text-purple-500' if con.is_soc else 'text-blue-500' }}">
+                        <!-- Владение контейнером -->
+                        <span class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded {{ 'text-purple-600 bg-purple-50' if con.is_soc else 'text-indigo-600 bg-indigo-50' }}">
                             {{ 'SOC' if con.is_soc else 'COC' }}
                         </span>
                     </div>
@@ -39,20 +72,34 @@
         </div>
 
         <!-- Краткая инфо по доставке -->
-        <div class="text-sm">
-            <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">Наземная логистика:</h4>
-            <div class="space-y-1">
-                <p>
-                    <span class="text-gray-500">Погрузка:</span> 
-                    {{ '🚚 Автодоставка' if order.pre_carriage_required else '🏢 Свой вывоз' }}
-                </p>
+        <div>
+            <h4 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8m-3-12h.008v.008H12V3.75zM3.75 21h16.5M12 6.75h.008v.008H12V6.75z" />
+                </svg>
+                Наземная логистика
+            </h4>
+            <div class="bg-white rounded-xl border border-slate-200/60 p-4 shadow-sm space-y-3 text-xs font-medium text-slate-700">
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-slate-400">Погрузка в порту:</span> 
+                    <span class="px-2 py-0.5 rounded {{ 'bg-purple-50 text-purple-700' if order.pre_carriage_required else 'bg-slate-100 text-slate-600' }}">
+                        {{ '🚚 Автодоставка' if order.pre_carriage_required else '🏢 Свой вывоз' }}
+                    </span>
+                </div>
+                
                 {% if not order.pre_carriage_required and order.pre_carriage_carrier %}
-                    <p class="text-xs text-orange-600 font-medium">Перевозчик: {{ order.pre_carriage_carrier }}</p>
+                    <div class="flex items-center justify-between gap-2 bg-amber-50/50 border border-amber-100 p-2 rounded-lg">
+                        <span class="text-amber-800 font-semibold">Перевозчик:</span>
+                        <span class="text-amber-700 font-bold">{{ order.pre_carriage_carrier }}</span>
+                    </div>
                 {% endif %}
-                <p>
-                    <span class="text-gray-500">Выгрузка:</span> 
-                    {{ '🚛 Автодоставка' if order.on_carriage_required else '🏢 Свой вывоз' }}
-                </p>
+                
+                <div class="flex items-center justify-between gap-2 border-t border-slate-100 pt-2">
+                    <span class="text-slate-400">Вывоз из порта:</span> 
+                    <span class="px-2 py-0.5 rounded {{ 'bg-purple-50 text-purple-700' if order.on_carriage_required else 'bg-slate-100 text-slate-600' }}">
+                        {{ '🚛 Автодоставка' if order.on_carriage_required else '🏢 Свой вывоз' }}
+                    </span>
+                </div>
             </div>
         </div>
     </div>

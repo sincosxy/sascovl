@@ -1,0 +1,60 @@
+
+<div class="p-4 bg-gray-50 border-x border-b rounded-b-lg shadow-inner">
+    <div class="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-4">
+        <!-- Список контейнеров -->
+        <div>
+            <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">Грузовые места:</h4>
+            <ul class="space-y-2">
+                {% for con in order.containers %}
+                <li class="flex items-center justify-between bg-white p-2 rounded border border-gray-200 text-sm">
+                    <div class="flex items-center gap-3">
+                        <span class="font-bold text-gray-700">{{ con.equipment.name }}</span>
+                        <span class="font-mono {{ 'text-red-500' if con.valid_number == False else 'text-gray-500' }}">{{ con.container_number or 'Назначается' }}</span>
+                    </div>
+                    
+                    <div class="flex items-center gap-2">
+                        <!-- ПИН-код в аккордеоне -->
+                        {% if con.pin_code and order.status == 'IN_PROGRESS' %}
+                            <span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-md text-[10px] font-black border border-orange-200">
+                                PIN: {{ con.pin_code }}
+                            </span>
+                        {% endif %}
+
+                        <span class="text-xs text-gray-500">Пломба:</span>
+                        <input type="text" 
+                            name="seal" 
+                            value="{{ con.seal or '' }}" 
+                            placeholder="Введите №"
+                            hx-patch="/api/orders/containers/{{ con.id }}/update-seal"
+                            hx-trigger="keyup changed delay:1s"
+                            class="text-xs border-b border-dashed border-blue-300 focus:border-blue-500 outline-none bg-transparent w-24">
+                        <span class="htmx-indicator animate-spin">⏳</span>
+                        
+                        <span class="text-[10px] {{ 'text-purple-500' if con.is_soc else 'text-blue-500' }}">
+                            {{ 'SOC' if con.is_soc else 'COC' }}
+                        </span>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <!-- Краткая инфо по доставке -->
+        <div class="text-sm">
+            <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">Наземная логистика:</h4>
+            <div class="space-y-1">
+                <p>
+                    <span class="text-gray-500">Погрузка:</span> 
+                    {{ '🚚 Автодоставка' if order.pre_carriage_required else '🏢 Свой вывоз' }}
+                </p>
+                {% if not order.pre_carriage_required and order.pre_carriage_carrier %}
+                    <p class="text-xs text-orange-600 font-medium">Перевозчик: {{ order.pre_carriage_carrier }}</p>
+                {% endif %}
+                <p>
+                    <span class="text-gray-500">Выгрузка:</span> 
+                    {{ '🚛 Автодоставка' if order.on_carriage_required else '🏢 Свой вывоз' }}
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
