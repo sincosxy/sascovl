@@ -1,4 +1,3 @@
-  GNU nano 6.2                                                         Dockerfile
 # Используем легкий образ Python
 FROM python:3.10-slim
 
