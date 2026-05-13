@@ -16,9 +16,24 @@ from datetime import datetime
 #from xhtml2pdf import pisa
 from io import BytesIO
 
+from zoneinfo import ZoneInfo
+from fastapi.templating import Jinja2Templates
 
 templates = Jinja2Templates(directory="app/templates")
 
+# Регистрируем фильтр локального времени Владивостока
+def format_vladivostok_time(dt_utc):
+    if not dt_utc:
+        return ""
+    # База обычно отдает naive-время, принудительно ставим UTC
+    if dt_utc.tzinfo is None:
+        dt_utc = dt_utc.replace(tzinfo=ZoneInfo("UTC"))
+    # Переводим во Владивосток (Asia/Vladivostok)
+    local_dt = dt_utc.astimezone(ZoneInfo("Asia/Vladivostok"))
+    # Форматируем в компактный вид
+    return local_dt.strftime("%d.%m.%Y %H:%M")
+
+templates.env.filters["vlad_time"] = format_vladivostok_time
 
 app = FastAPI(title="CargoFlow API")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
