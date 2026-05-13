@@ -345,7 +345,7 @@ async def save_step_1(
     await db.refresh(order)
 
     # 3. Достаем порты
-    ports_result = await db.execute(select(Port).where(Port.is_active == True))
+    ports_result = await db.execute(select(Port).where(Port.is_active == True).order_by(Port.name))
     ports = ports_result.scalars().all()
 
     # 4. Возвращаем ответ
