@@ -24,9 +24,8 @@
                 <tr class="hover:bg-blue-50/50 transition">
                 <!--tr class="hover:bg-blue-50/50 transition cursor-pointer" onclick="toggleDetails({{ order.id }})"-->
 
-                    <td class="px-6 py-4">
+                    <!--td class="px-6 py-4">
                         <div class="flex items-center space-x-3">
-                            <!-- Стрелочка -->
                             <button class="text-gray-400 hover:text-indigo-600 transition-all duration-300"
                                     id="btn-{{ order.id }}"
                                     hx-get="/api/orders/{{ order.id }}/details"
@@ -39,7 +38,33 @@
                             <div class="font-bold text-blue-600">#{{ order.id }}</div>
                             <div class="text-[10px] text-gray-400">{{ order.created_at }}</div>
                         </div>
-                    </td>
+                    </td-->
+                    <td class="px-6 py-4 whitespace-nowrap align-middle">
+                        <div class="flex items-center gap-4">
+                            <!-- Кнопка-стрелочка (без изменений по HTMX) -->
+                            <button class="text-slate-400 hover:text-indigo-600 hover:scale-110 transition-all duration-300"
+                                    id="btn-{{ order.id }}"
+                                    hx-get="/api/orders/{{ order.id }}/details"
+                                    hx-target="#details-{{ order.id }}"
+                                    onclick="toggleDetails('{{ order.id }}')">
+                                <svg id="icon-{{ order.id }}" class="w-5 h-5 transition-transform duration-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            
+                            <!-- Блок с информацией (Разделен на 2 строки для читаемости) -->
+                            <div class="flex flex-col min-w-0">
+                                <!-- Номер заказа -->
+                                <span class="text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
+                                    #{{ order.id }}
+                                </span>
+                                <!-- Красивое местное время через наш фильтр -->
+                                <span class="text-[11px] font-medium text-slate-400 mt-0.5 tracking-wide">
+                                    {{ order.created_at|vlad_time }}
+                                </span>
+                            </div>
+                        </div>
+                    </td>                    
                     <td class="p-4">
                         <div class="text-sm font-bold text-gray-700">
                             {# Если у User есть поле full_name, используем его, иначе email #}
