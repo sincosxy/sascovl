@@ -537,7 +537,7 @@ async def save_step_3(
     seals = form_data.getlist("seal[]")
     weights = form_data.getlist("weight_gross[]")
     pieces = form_data.getlist("pieces[]")
-    descriptions = form_data.getlist("descriptions[]")
+    description = form_data.getlist("cargo_description[]")
     is_lcl = form_data.getlist("is_lcl[]")
     # Списки для реф-контейнеров (индексы строк)
     vent_indices = form_data.getlist("ventilation[]")
@@ -560,7 +560,7 @@ async def save_step_3(
             seal=seals[i] if i < len(seals) else None,
             weight_gross=float(get_val(weights, i)) if get_val(weights, i) else 0.0,
             pieces=int(get_val(pieces, i)) if get_val(pieces, i) else 0,
-            cargo_description=get_val(descriptions, i),
+            cargo_description=get_val(description, i),
             
             # Реф-поля
             temperature=float(temps[i]) if i < len(temps) and temps[i] else None,
