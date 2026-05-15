@@ -951,15 +951,18 @@ async def get_order_summary(
     result = await db.execute(
         select(CargoOrder)
         .options(
-            joinedload(CargoOrder.port_of_loading),
-            joinedload(CargoOrder.port_of_discharge),
-            joinedload(CargoOrder.shipper),
-            joinedload(CargoOrder.consignee),
-            joinedload(CargoOrder.notify_party),  # Добавь, если используешь его в шаблоне
-            # Загружаем контейнеры И их тип оборудования (Equipment)
-            selectinload(CargoOrder.containers).joinedload(Container.equipment)
+            # Подгружаем всё дерево связей для финала
+            selectinload(CargoOrder.containers).options(
+                selectinload(Container.items),
+                selectinload(Container.equipment)
+            ),
+            selectinload(CargoOrder.port_of_loading),
+            selectinload(CargoOrder.port_of_discharge),
+            selectinload(CargoOrder.shipper),
+            selectinload(CargoOrder.consignee),
+            selectinload(CargoOrder.equipment) # Общий тип из Шага 1
         )
-        .where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
+        .where(CargoOrder.id == order_id)
     )
     order = result.scalars().first()
 
