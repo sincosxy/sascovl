@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<!--html>
 <head>
     <meta charset="utf-8">
     <style>
@@ -70,6 +70,114 @@
 
     <div class="footer">
         <p>Документ сформирован автоматически в системе CargoFlow.</p>
+    </div>
+</body>
+</html-->
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        @font-face {
+            font-family: 'DejaVu';
+            src: url('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf');
+        }
+        @page {
+            size: a4 portrait;
+            margin: 1.5cm;
+            @frame footer {
+                -pdf-frame-content: footer_content;
+                bottom: 1cm;
+                margin-left: 1.5cm;
+                margin-right: 1.5cm;
+                height: 1cm;
+            }
+        }
+        /* Подключаем шрифт для кириллицы */
+        body { 
+            font-family: 'DejaVu', sans-serif; /* Используем наш шрифт */
+            font-size: 10pt; 
+            color: #333; 
+        }
+        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        .section-title { background: #eee; padding: 5px; font-weight: bold; text-transform: uppercase; font-size: 9pt; margin-top: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 0.5pt solid #ccc; padding: 6px; text-align: left; vertical-align: top; }
+        th { background-color: #f9f9f9; font-size: 8pt; color: #666; }
+        .total-row { background: #333; color: #fff; font-weight: bold; }
+        .lcl-item { font-style: italic; font-size: 8pt; color: #555; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1 style="font-size: 18pt; margin-bottom: 5px;">ПОДТВЕРЖДЕНИЕ БРОНИРОВАНИЯ</h1>
+        <p>Заказ №{{ order.id }} от {{ order.loading_date.strftime('%d.%m.%Y') }}</p>
+    </div>
+
+    <table>
+        <tr>
+            <td width="50%">
+                <div class="section-title">Отправитель</div>
+                <b>{{ order.shipper.name }}</b>
+            </td>
+            <td width="50%">
+                <div class="section-title">Получатель</div>
+                <b>{{ order.consignee.name }}</b>
+            </td>
+        </tr>
+    </table>
+
+    <div class="section-title">Логистические параметры</div>
+    <table>
+        <tr>
+            <th>Порт погрузки</th>
+            <th>Порт выгрузки</th>
+            <th>Тип оборудования</th>
+        </tr>
+        <tr>
+            <td>{{ order.port_of_loading.name }}</td>
+            <td>{{ order.port_of_discharge.name }}</td>
+            <td>{{ order.equipment.name if order.equipment else 'Контейнеры' }}</td>
+        </tr>
+    </table>
+
+    <div class="section-title">Детализация груза</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Тип</th>
+                <th>Номер / Пломба</th>
+                <th>Собственность</th>
+                <th>Вес (брутто)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for con in order.containers %}
+            <tr>
+                <td>{{ con.equipment.name }}</td>
+                <td>{{ con.container_number or 'Назначается' }}<br><small>Seal: {{ con.seal or '-' }}</small></td>
+                <td>{{ 'SOC' if con.is_soc else 'COC' }}</td>
+                <td style="text-align: right;">{{ "{:,.2f}".format(con.weight_gross) }} kg</td>
+            </tr>
+            {% if con.items %}
+            <tr>
+                <td colspan="4" style="background: #fdfdfd; padding-left: 20px;">
+                    <div style="font-size: 7pt; color: #999;">СОДЕРЖИМОЕ:</div>
+                    {% for item in con.items %}
+                        <div class="lcl-item">• {{ item.name }} ({{ item.pieces }} мест, {{ item.weight_gross }} кг)</div>
+                    {% endfor %}
+                </td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+            <tr class="total-row">
+                <td colspan="3" style="text-align: right;">ИТОГО ВЕС:</td>
+                <td style="text-align: right;">{{ "{:,.2f}".format(order.containers|sum(attribute='weight_gross')) }} kg</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div id="footer_content">
+        Стр. <pdf:pagenumber> из <pdf:pagecount> | Сгенерировано в CargoFlow
     </div>
 </body>
 </html>

@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from typing import List
 from datetime import datetime, date, timedelta
 
-#from xhtml2pdf import pisa
+from xhtml2pdf import pisa
 from io import BytesIO
 
 from zoneinfo import ZoneInfo
@@ -742,7 +742,10 @@ async def save_step_4(
             joinedload(CargoOrder.shipper),
             joinedload(CargoOrder.consignee),
             # Важно для таблицы контейнеров:
-            selectinload(CargoOrder.containers).joinedload(Container.equipment)
+            selectinload(CargoOrder.containers).options(
+                selectinload(Container.items),
+                selectinload(Container.equipment)
+            )
         )
         .where(CargoOrder.id == order_id)
     )
@@ -1188,11 +1191,15 @@ async def generate_pdf(
     result = await db.execute(
         select(CargoOrder)
         .options(
-            joinedload(CargoOrder.port_of_loading),
-            joinedload(CargoOrder.port_of_discharge),
-            joinedload(CargoOrder.shipper),
-            joinedload(CargoOrder.consignee),
-            selectinload(CargoOrder.containers).joinedload(Container.equipment)
+            selectinload(CargoOrder.port_of_loading),
+            selectinload(CargoOrder.port_of_discharge),
+            selectinload(CargoOrder.shipper),
+            selectinload(CargoOrder.consignee),
+            selectinload(CargoOrder.equipment),
+            selectinload(CargoOrder.containers).options(
+                selectinload(Container.equipment),
+                selectinload(Container.items) # ОБЯЗАТЕЛЬНО ДЛЯ ОТЧЕТА
+            )
         )
         .where(CargoOrder.id == order_id)
     )

@@ -21,15 +21,20 @@
             <section>
                 <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Логистика</h3>
                 <div class="bg-gray-50 p-4 rounded-lg border border-gray-100">
-                    <div class="flex items-center gap-2 mb-2">
+                    <div class="flex items-center gap-2 mb-3">
                         <span class="text-xl">🚢</span>
                         <span class="font-semibold">{{ order.port_of_loading.name }}</span>
                         <span class="text-gray-400">→</span>
                         <span class="font-semibold">{{ order.port_of_discharge.name }}</span>
                     </div>
-                    <p class="text-sm text-gray-600">Тип перевозки: 
-                        <span class="font-medium text-gray-800">{{ 'Генгруз' if order.cargo_type == 'general' else 'Контейнеры' }}</span>
-                    </p>
+                    <div class="space-y-1">
+                        <p class="text-sm text-gray-600">Тип: 
+                            <span class="font-medium text-gray-800">{{ 'Генгруз' if order.transport_type == 'general_cargo' else 'Контейнеры' }}</span>
+                        </p>
+                        <p class="text-sm text-gray-600">📅 Дата погрузки: 
+                            <span class="font-bold text-blue-700">{{ order.loading_date.strftime('%d.%m.%Y') if order.loading_date else 'Не указана' }}</span>
+                        </p>
+                    </div>
                 </div>
             </section>
 
@@ -87,74 +92,55 @@
             </thead>
             <tbody class="divide-y divide-slate-100">
                 {% for con in order.containers %}
-                <!-- Если контейнер отменен, строка бледнеет (opacity-60) -->
-                <tr class="align-top transition-colors duration-150 {{ 'bg-slate-50/70 text-slate-400 opacity-60' if con.is_cancelled else 'hover:bg-slate-50/40' }}">
+                <tr class="align-top transition-colors duration-150 {{ 'bg-slate-50/70 opacity-60' if con.is_cancelled else 'hover:bg-slate-50/40' }}">
                     
-                    <!-- Тип -->
+                    <!-- Тип и Температурный режим -->
                     <td class="p-3 pl-4">
-                        <div class="font-semibold {{ 'text-slate-400 line-through' if con.is_cancelled else 'text-slate-800' }}">
-                            {{ con.equipment.name }}
-                        </div>
-                        {% if con.temperature is not none and not con.is_cancelled %}
-                            <div class="text-[10px] text-sky-600 font-bold mt-0.5">t°: {{ con.temperature }}°C</div>
+                        <div class="font-semibold text-slate-800">{{ con.equipment.name }}</div>
+                        {% if 'RF' in con.equipment.name and con.temperature is not none %}
+                            <div class="text-[10px] text-sky-600 font-bold mt-0.5">🌡️ {{ con.temperature }}°C</div>
                         {% endif %}
                     </td>
                     
-                    <!-- Номер -->
+                    <!-- Номер контейнера -->
                     <td class="p-3 font-mono text-xs">
-                        {% if con.is_cancelled %}
-                            <div class="text-slate-400 line-through">{{ con.container_number or 'Не назначен' }}</div>
-                            <div class="text-[10px] text-rose-600 font-sans font-medium mt-0.5">
-                                🚫 Отменен: {{ con.cancel_reason or 'без указания причины' }}
-                            </div>
-                        {% else %}
-                            <div class="{{ 'text-rose-600 font-bold' if con.valid_number == False else 'text-slate-700 font-medium' }}">
-                                {{ con.container_number or '<span class="text-slate-300 italic font-sans">Назначается</span>' | safe }}
-                                {% if con.valid_number == False %}
-                                    <span class="text-[10px] font-sans font-normal ml-0.5">(ошибка КС)</span>
-                                {% endif %}
-                            </div>
-                        {% endif %}
-                    </td>
-                    
-                    <!-- Пломба -->
-                    <td class="p-3">    
-                        <div class="flex items-center gap-1.5 {% if con.is_cancelled %}pointer-events-none select-none{% endif %}">
-                            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Seal:</span>
-                            <input type="text" 
-                                   name="seal" 
-                                   value="{{ con.seal or '' }}" 
-                                   placeholder="№ не указан"
-                                   {% if con.is_cancelled %}disabled{% endif %}
-                                   hx-patch="/api/orders/containers/{{ con.id }}/update-seal"
-                                   hx-trigger="keyup changed delay:1s"
-                                   class="text-xs font-semibold border-b border-transparent hover:border-indigo-300 focus:border-indigo-500 outline-none bg-transparent w-28 text-indigo-600 placeholder-slate-300 transition-colors disabled:border-transparent disabled:text-slate-400">
+                        <div class="{{ 'text-rose-600 font-bold' if con.valid_number == False else 'text-slate-700' }}">
+                            {{ con.container_number or 'Назначается' }}
                         </div>
                     </td>
                     
-                    <!-- ПИН -->
-                    <td class="p-3 text-xs align-middle">
-                        {% if con.pin_code and order.status == 'IN_PROGRESS' and not con.is_cancelled %}
-                            <div class="text-[10px] flex items-center gap-1 w-fit">
-                                <span class="font-bold text-amber-600">ПИН:</span>
-                                <span class="bg-amber-50 text-amber-800 font-bold px-1.5 py-0.5 rounded border border-amber-200 tracking-wide">{{ con.pin_code }}</span>
-                            </div>
-                        {% endif %}
-                    </td>
+                    <td class="p-3 text-slate-600">{{ con.seal or '-' }}</td>
+                    <td class="p-3 text-slate-600">{{ con.pin_code or '-' }}</td>
                     
                     <!-- Собственность -->
-                    <td class="p-3 align-middle">
-                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider
-                            {{ 'bg-slate-200/60 text-slate-400' if con.is_cancelled else ('bg-purple-50 text-purple-700 border border-purple-100' if con.is_soc else 'bg-indigo-50 text-indigo-700 border border-indigo-100') }}">
+                    <td class="p-3">
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase {{ 'bg-purple-100 text-purple-700' if con.is_soc else 'bg-blue-100 text-blue-700' }}">
                             {{ 'SOC' if con.is_soc else 'COC' }}
                         </span>
                     </td>
-                    
-                    <!-- Вес -->
-                    <td class="p-3 pr-4 text-right font-mono text-xs align-middle {{ 'line-through text-slate-400' if con.is_cancelled else 'text-slate-700 font-medium' }}">
-                        {{ con.weight_gross }} кг
+
+                    <!-- Вес (Брутто) -->
+                    <td class="p-3 pr-4 text-right font-bold text-slate-700">
+                        {{ "{:,.2f}".format(con.weight_gross) }} кг
                     </td>
                 </tr>
+
+                <!-- ПОДСТРОКА СО СБОРНЫМ ГРУЗОМ (LCL) -->
+                {% if con.items %}
+                <tr class="bg-indigo-50/30">
+                    <td colspan="6" class="p-3 pl-8">
+                        <div class="text-[10px] font-bold text-indigo-400 uppercase mb-2">Содержимое контейнера:</div>
+                        <div class="space-y-1">
+                            {% for item in con.items %}
+                            <div class="flex justify-between text-xs border-b border-indigo-100/50 pb-1">
+                                <span class="text-indigo-900 italic">📦 {{ item.name }}</span>
+                                <span class="text-slate-500">{{ item.pieces }} мест / <b>{{ item.weight_gross }} кг</b></span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </td>
+                </tr>
+                {% endif %}
                 {% endfor %}
             </tbody>
         </table>
