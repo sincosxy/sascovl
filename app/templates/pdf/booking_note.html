@@ -108,76 +108,131 @@
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1 style="font-size: 18pt; margin-bottom: 5px;">ПОДТВЕРЖДЕНИЕ БРОНИРОВАНИЯ</h1>
-        <p>Заказ №{{ order.id }} от {{ order.loading_date.strftime('%d.%m.%Y') }}</p>
-    </div>
-
-    <table>
+    <!-- Шапка с данными вашей компании (из User.company) -->
+    <table class="header-table">
         <tr>
-            <td width="50%">
-                <div class="section-title">Отправитель</div>
-                <b>{{ order.shipper.name }}</b>
+            <td>
+                <div class="company-name">{{ order.owner.company.name if order.owner.company else 'CARGOFLOW LOGISTICS' }}</div>
+                <div>{{ order.owner.company.fullname or '' }}</div>
+                <div style="font-size: 7pt;">ИНН: {{ order.owner.company.inn or '-' }} | Тел: {{ order.owner.company.tel1 or '-' }}</div>
             </td>
-            <td width="50%">
-                <div class="section-title">Получатель</div>
-                <b>{{ order.consignee.name }}</b>
+            <td style="text-align: right;">
+                <h2 style="margin: 0; color: #444;">BOOKING NOTE</h2>
+                <div style="font-size: 11pt; font-weight: bold;">№ {{ order.id }}</div>
+                <div>Дата заказа: {{ order.created_at.strftime('%d.%m.%Y') }}</div>
             </td>
         </tr>
     </table>
 
-    <div class="section-title">Логистические параметры</div>
-    <table>
+    <!-- Участники -->
+    <table class="grid-table">
         <tr>
-            <th>Порт погрузки</th>
-            <th>Порт выгрузки</th>
-            <th>Тип оборудования</th>
-        </tr>
-        <tr>
-            <td>{{ order.port_of_loading.name }}</td>
-            <td>{{ order.port_of_discharge.name }}</td>
-            <td>{{ order.equipment.name if order.equipment else 'Контейнеры' }}</td>
+            <td>
+                <span class="label">Отправитель (Shipper)</span>
+                <b>{{ order.shipper.name }}</b><br>
+                {{ order.shipper.address or '' }}<br>
+                {{ order.shipper.contact_info or '' }}
+            </td>
+            <td>
+                <span class="label">Получатель (Consignee)</span>
+                <b>{{ order.consignee.name }}</b><br>
+                {{ order.consignee.address or '' }}<br>
+                {{ order.consignee.contact_info or '' }}
+            </td>
         </tr>
     </table>
 
-    <div class="section-title">Детализация груза</div>
-    <table>
+    <!-- Логистика -->
+    <div class="section-title">Маршрут и оборудование</div>
+    <table class="grid-table">
+        <tr>
+            <td>
+                <span class="label">Порт погрузки (POL)</span>
+                <b>{{ order.port_of_loading.name }}</b>
+                <div style="margin-top: 5px;">Дата погрузки: <b>{{ order.loading_date.strftime('%d.%m.%Y') if order.loading_date else '-' }}</b></div>
+            </td>
+            <td>
+                <span class="label">Порт выгрузки (POD)</span>
+                <b>{{ order.port_of_discharge.name }}</b>
+                <div style="margin-top: 5px;">Тип оборудования: <b>{{ order.equipment.name if order.equipment else 'Контейнеры' }}</b></div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Спецификация груза -->
+    <div class="section-title">Спецификация контейнеров и груза</div>
+    <table class="cargo-table">
         <thead>
             <tr>
-                <th>Тип</th>
-                <th>Номер / Пломба</th>
-                <th>Собственность</th>
-                <th>Вес (брутто)</th>
+                <th>№ Контейнера / Тип</th>
+                <th>Пломба / SOC</th>
+                <th>Вес брутто</th>
+                <th>Мест</th>
+                <th>Описание груза (Items)</th>
             </tr>
         </thead>
         <tbody>
             {% for con in order.containers %}
             <tr>
-                <td>{{ con.equipment.name }}</td>
-                <td>{{ con.container_number or 'Назначается' }}<br><small>Seal: {{ con.seal or '-' }}</small></td>
-                <td>{{ 'SOC' if con.is_soc else 'COC' }}</td>
-                <td style="text-align: right;">{{ "{:,.2f}".format(con.weight_gross) }} kg</td>
+                <td><b>{{ con.container_number or 'TBN' }}</b><br>{{ con.equipment.name }}</td>
+                <td>{{ con.seal or '-' }}<br>{{ 'SOC' if con.is_soc else 'COC' }}</td>
+                <td style="text-align: center;">{{ "{:,.2f}".format(con.weight_gross or 0) }} kg</td>
+                <td style="text-align: center;">{{ con.pieces or 0 }}</td>
+                <td>
+                    {% if con.is_lcl and con.items %}
+                        {% for item in con.items %}
+                        <div style="border-bottom: 0.1pt solid #eee; margin-bottom: 2px;">
+                            • {{ item.name }}: {{ item.pieces }} мест / {{ item.weight_gross }} kg
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        {{ con.cargo_description or '-' }}
+                    {% endif %}
+                </td>
             </tr>
-            {% if con.items %}
-            <tr>
-                <td colspan="4" style="background: #fdfdfd; padding-left: 20px;">
-                    <div style="font-size: 7pt; color: #999;">СОДЕРЖИМОЕ:</div>
-                    {% for item in con.items %}
-                        <div class="lcl-item">• {{ item.name }} ({{ item.pieces }} мест, {{ item.weight_gross }} кг)</div>
-                    {% endfor %}
+            {% if 'RF' in con.equipment.name %}
+            <tr style="background: #f0f7ff;">
+                <td colspan="5" style="font-size: 8pt;">
+                    ❄️ <b>Реф-режим:</b> {{ con.temperature }}°C | Вент: {{ 'Да' if con.ventilation else 'Нет' }} | Подключение: {{ con.plug_start_date.strftime('%d.%m.%Y') if con.plug_start_date else '-' }}
                 </td>
             </tr>
             {% endif %}
             {% endfor %}
-            <tr class="total-row">
-                <td colspan="3" style="text-align: right;">ИТОГО ВЕС:</td>
-                <td style="text-align: right;">{{ "{:,.2f}".format(order.containers|sum(attribute='weight_gross')) }} kg</td>
-            </tr>
         </tbody>
     </table>
 
-    <div id="footer_content">
-        Стр. <pdf:pagenumber> из <pdf:pagecount> | Сгенерировано в CargoFlow
+    <!-- Автодоставка (Pre/On carriage) -->
+    <div style="margin-top: 15px;">
+        <div style="width: 48%; float: left;">
+            <div class="section-title">Автовывоз (Пункт отправления)</div>
+            <div style="padding: 5px; border: 0.5pt solid #ccc; min-height: 50px;">
+                {% if order.pre_carriage_required %}
+                    <b>Адрес:</b> {{ order.pre_carriage_address }}<br>
+                    <b>Дата/Время:</b> {{ order.pre_carriage_date.strftime('%d.%m.%Y %H:%M') if order.pre_carriage_date else '-' }}<br>
+                    <b>Контакт:</b> {{ order.pre_carriage_contact or '-' }}
+                {% else %}
+                    <i>Организуется силами отправителя</i><br>
+                    Перевозчик: {{ order.pre_carriage_carrier or '-' }}
+                {% endif %}
+            </div>
+        </div>
+        <div style="width: 48%; float: right;">
+            <div class="section-title">Автодоставка (Пункт назначения)</div>
+            <div style="padding: 5px; border: 0.5pt solid #ccc; min-height: 50px;">
+                {% if order.on_carriage_required %}
+                    <b>Адрес:</b> {{ order.on_carriage_address }}<br>
+                    <b>Контакт:</b> {{ order.on_carriage_contact or '-' }}<br>
+                    <b>Прим:</b> {{ order.on_carriage_notes or '-' }}
+                {% else %}
+                    <i>Организуется силами получателя</i>
+                {% endif %}
+            </div>
+        </div>
+        <div style="clear: both;"></div>
+    </div>
+
+    <div class="footer">
+        Документ сформирован автоматически в системе CargoFlow. Данное подтверждение не является окончательным счетом.
     </div>
 </body>
 </html>

@@ -1194,14 +1194,15 @@ async def generate_pdf(
     result = await db.execute(
         select(CargoOrder)
         .options(
-            selectinload(CargoOrder.port_of_loading),
-            selectinload(CargoOrder.port_of_discharge),
+            selectinload(CargoOrder.owner).joinedload(User.company), # Данные вашей компании
             selectinload(CargoOrder.shipper),
             selectinload(CargoOrder.consignee),
+            selectinload(CargoOrder.port_of_loading),
+            selectinload(CargoOrder.port_of_discharge),
             selectinload(CargoOrder.equipment),
             selectinload(CargoOrder.containers).options(
                 selectinload(Container.equipment),
-                selectinload(Container.items) # ОБЯЗАТЕЛЬНО ДЛЯ ОТЧЕТА
+                selectinload(Container.items)  # Те самые CargoItems
             )
         )
         .where(CargoOrder.id == order_id)
