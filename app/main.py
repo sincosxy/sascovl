@@ -5,13 +5,13 @@ from app.db import engine, Base, get_db
 from sqlalchemy import select, delete  
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
-from app.models import User, Counterparty, CargoOrder, UserRole, Port, TransportType, Equipment, Container, Company
+from app.models import User, Counterparty, CargoOrder, UserRole, Port, TransportType, Equipment, Container, Company, CargoItem
 from app.auth import verify_password, create_access_token, get_current_user, hash_password 
 from app.schemas import Token, UserLogin, CounterpartyCreate, CounterpartyRead, OrderRead, UserCreate
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
 from typing import List
-from datetime import datetime
+from datetime import datetime, date, timedelta
 
 #from xhtml2pdf import pisa
 from io import BytesIO
@@ -285,12 +285,15 @@ async def init_order(
     db.add(new_order)
     await db.commit()
     await db.refresh(new_order)
+    
+    today = date.today().isoformat()
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
 
     # Возвращаем Шаг 1 (как раньше делал start_order)
     return templates.TemplateResponse(
         request=request,
         name="partials/step_1.html",
-        context={"order_id": new_order.id, "order": new_order, "current_step": "step-1"}
+        context={"order_id": new_order.id, "order": new_order, "today": today, "default_date": tomorrow, "current_step": "step-1"}
     )
     
 @app.post("/api/orders/{order_id}/check-type")
@@ -298,32 +301,39 @@ async def check_type(
     request: Request,
     order_id: int,
     transport_type: str = Form(...),
+    loading_date: str = Form(...), # Получаем дату из формы
     db: AsyncSession = Depends(get_db)
 ):
-    # 1. Достаем заказ в самом начале функции
     result = await db.execute(select(CargoOrder).where(CargoOrder.id == order_id))
     order = result.scalars().first()
     
-    # Защита: если вдруг заказа нет
     if not order:
         raise HTTPException(status_code=404, detail="Заказ не найден")
 
-    # 2. Теперь переменная 'order' точно существует и доступна ниже
+    # Обновляем общие поля для обоих типов
+    order.transport_type = transport_type.upper()
+    
+    # Конвертируем строку из инпута в объект даты Python
+    if loading_date:
+        order.loading_date = datetime.strptime(loading_date, "%Y-%m-%d").date()
+
     if transport_type == "container":
+        eq_result = await db.execute(select(Equipment))
+        equipments = eq_result.scalars().all()
+        await db.commit() # Сохраняем изменения перед переходом
         return templates.TemplateResponse(
             request=request,
             name="partials/step_1_soc_selection.html", 
             context={
                 "order_id": order_id, 
                 "transport_type": transport_type, 
-                "order": order  # Теперь ошибки UnboundLocalError не будет
+                "order": order,
+                "equipments": equipments
             }
         )
     
-    # Логика для генгруза
-    order.transport_type = "general_cargo"
+    # Логика для генгруза (уже обновлено выше)
     await db.commit()
-    # Здесь вызывай свой переход на следующий шаг (Маршрут/Контакты)
     return await get_step_2_route(request, order_id, db)
 
 @app.patch("/api/orders/{order_id}/step-1")
@@ -331,6 +341,7 @@ async def save_step_1(
     order_id: int,
     request: Request,
     transport_type: str = Form(...), 
+    equipment_id: int = Form(...),
     is_soc: bool = Form(False),
     needs_return: bool = Form(False),
     return_instructions: str = Form(None),
@@ -354,6 +365,7 @@ async def save_step_1(
 
     # 2. Обновляем тип
     order.transport_type = transport_type.upper()
+    order.equipment_id = equipment_id
     order.is_soc = is_soc
     order.return_instructions = return_instructions if is_soc else None
     await db.commit()
@@ -489,8 +501,115 @@ async def add_container_row(request: Request, order_id: int, index: int = 0, db:
         }
     )
 
-
 @app.patch("/api/orders/{order_id}/step-3")
+async def save_step_3(
+    order_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    form_data = await request.form()
+    
+    # 1. Загружаем заказ
+    result = await db.execute(
+        select(CargoOrder)
+        .options(
+            # Подгружаем контейнеры, а ВНУТРИ них — их грузы
+            selectinload(CargoOrder.containers).selectinload(Container.items),
+            selectinload(CargoOrder.equipment) # Если нужно название типа
+        )
+        .where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
+    )
+    order = result.scalars().first()
+    
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+
+    # 2. Удаляем старые контейнеры (каскадом удалятся и старые CargoItems)
+    await db.execute(delete(Container).where(Container.order_id == order_id))
+
+    # 3. Получаем основные списки
+    # row_idx[] — это скрытое поле <input type="hidden" name="row_idx[]" value="{{ loop_index }}">
+    indices = form_data.getlist("row_idx[]")
+    
+    eq_ids = form_data.getlist("equipment_id[]")
+    numbers = form_data.getlist("container_number[]")
+    seals = form_data.getlist("seal[]")
+    weights = form_data.getlist("weight_gross[]")
+    pieces = form_data.getlist("pieces[]")
+    descriptions = form_data.getlist("descriptions[]")
+    is_lcl = form_data.getlist("is_lcl[]")
+    # Списки для реф-контейнеров (индексы строк)
+    vent_indices = form_data.getlist("ventilation[]")
+    port_indices = form_data.getlist("port_plug[]")
+    vessel_indices = form_data.getlist("vessel_plug[]")
+    
+    temps = form_data.getlist("temperature[]")
+    plug_dates = form_data.getlist("plug_start_date[]")
+    def get_val(lst, idx, default=None):
+            return lst[idx] if idx < len(lst) else default
+    for i, idx in enumerate(indices):
+        # Создаем контейнер
+        new_con = Container(
+            order_id=order_id,
+            equipment_id=int(eq_ids[i]),
+            is_soc=order.is_soc,
+            is_lcl=idx in is_lcl,
+            container_number=numbers[i] if i < len(numbers) else None,
+            valid_number=validate_container_number(numbers[i]) if i < len(numbers) else False,
+            seal=seals[i] if i < len(seals) else None,
+            weight_gross=float(get_val(weights, i)) if get_val(weights, i) else 0.0,
+            pieces=int(get_val(pieces, i)) if get_val(pieces, i) else 0,
+            cargo_description=get_val(descriptions, i),
+            
+            # Реф-поля
+            temperature=float(temps[i]) if i < len(temps) and temps[i] else None,
+            ventilation=idx in vent_indices,
+            port_plug=idx in port_indices,
+            vessel_plug=idx in vessel_indices,
+        )
+
+        # Дата подключения
+        date_str = plug_dates[i] if i < len(plug_dates) else None
+        if date_str:
+            try:
+                new_con.plug_start_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            except ValueError: pass
+
+        # 4. СОХРАНЕНИЕ ГРУЗОВ (CargoItem) для данного контейнера
+        # Достаем списки по ключу с индексом: item_name[0][], item_name[1][] и т.д.
+        item_names = form_data.getlist(f"item_name[{idx}][]")
+        item_weights = form_data.getlist(f"item_weight[{idx}][]")
+        item_pieces = form_data.getlist(f"item_pieces[{idx}][]")
+
+        for j in range(len(item_names)):
+            if item_names[j].strip(): # Сохраняем, только если название не пустое
+                new_item = CargoItem(
+                    name=item_names[j],
+                    weight_gross=float(item_weights[j]) if j < len(item_weights) and item_weights[j] else 0.0,
+                    pieces=int(item_pieces[j]) if j < len(item_pieces) and item_pieces[j] else 0
+                )
+                new_con.items.append(new_item)
+
+        db.add(new_con)
+
+    await db.commit()
+    
+    # Пересобираем объект с новыми связями для шаблона
+    result = await db.execute(
+        select(CargoOrder)
+        .options(selectinload(CargoOrder.containers).selectinload(Container.items))
+        .where(CargoOrder.id == order_id)
+    )
+    order = result.scalars().first()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/step_4_trucking.html",
+        context={"order_id": order_id, "order": order, "current_step": "step-4"}
+    )
+
+@app.patch("/api/orders/{order_id}/step-33")
 async def save_step_3(
     order_id: int,
     request: Request,
@@ -714,11 +833,16 @@ async def get_step_3(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Добавляем цепочку загрузки: Заказ -> Контейнеры -> Тип оборудования
+    # Добавляем полную цепочку: Заказ -> Контейнеры -> Грузы (Items)
+    # А также подгружаем оборудование для самого заказа и для контейнеров
     result = await db.execute(
         select(CargoOrder)
         .options(
-            selectinload(CargoOrder.containers).joinedload(Container.equipment)
+            selectinload(CargoOrder.equipment), # Оборудование заказа (Шаг 1)
+            selectinload(CargoOrder.containers).options(
+                selectinload(Container.items),      # ГРУЗЫ ВНУТРИ КОНТЕЙНЕРА
+                joinedload(Container.equipment)    # Оборудование контейнера
+            )
         )
         .where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
     )
@@ -727,6 +851,7 @@ async def get_step_3(
     if not order:
         raise HTTPException(status_code=404, detail="Заказ не найден")
 
+    # Это можно оставить, если все еще нужен полный список в шаблоне
     eq_res = await db.execute(select(Equipment))
     equipments = eq_res.scalars().all()
 
@@ -736,7 +861,8 @@ async def get_step_3(
         context={
             "order": order, 
             "order_id": order_id, 
-            "equipments": equipments
+            "equipments": equipments,
+            "current_step": "step-3"
         }
     )
 

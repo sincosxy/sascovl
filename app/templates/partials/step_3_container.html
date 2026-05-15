@@ -1,12 +1,29 @@
 <div id="step-container" class="max-w-5xl mx-auto p-6 bg-white shadow-lg rounded-lg">
     <h2 class="text-2xl font-bold mb-6 text-gray-800 border-b pb-2">Шаг 3: Детализация контейнеров</h2>
     {% include 'partials/wizard_nav.html' %}
+
+    {% if not order.equipment_id %}
+    <div class="p-8 text-center bg-red-50 border-2 border-dashed border-red-200 rounded-xl animate-pulse">
+        <div class="text-5xl mb-4">⚠️</div>
+        <h3 class="text-lg font-bold text-red-800">Тип оборудования не выбран</h3>
+        <p class="text-red-600 mb-6">Чтобы добавить контейнеры, нужно сначала указать их тип на первом шаге.</p>
+        
+        <button hx-get="/api/orders/{{ order_id }}/step-1" 
+                hx-target="#main-content"
+                class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium">
+            ← Вернуться на Шаг 1
+        </button>
+    </div>
+    {% else %}
+
     <form hx-patch="/api/orders/{{ order_id }}/step-3" hx-target="#main-content" class="space-y-6">
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="bg-gray-50 text-gray-600 uppercase text-xs">
-                        <th class="p-3 border-b">Тип eq.</th>
+                        <th class="p-3 border-b text-blue-700">
+                            Тип: {{ order.equipment.name }}
+                        </th>
                         <!--th class="p-3 border-b text-center">SOC</th-->
                         {% if order.is_soc %}
                             <th class="p-3 border-b">Номер контейнера</th>
@@ -22,7 +39,8 @@
                     {% if order.containers %}
                         {% for container in order.containers %}
                             {% set loop_index = loop.index0 %}
-                            {% include 'partials/container_row.html' %}
+                            {% include 'partials/container_row.html' with context %}
+                            {#% include 'partials/container_row.html' %#}
                             {# 'with context' прокинет loop.index0 автоматически как loop_index #}
                         {% endfor %}
                     {% else %}
@@ -58,6 +76,7 @@
             </div>
         </div>
     </form>
+    {% endif %}
 </div>
 <script>
 function toggleReeferRow(id, select) {

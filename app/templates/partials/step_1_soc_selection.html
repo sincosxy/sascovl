@@ -5,6 +5,19 @@
         <!-- Скрытый тип, который выбрали на прошлом экране -->
         <input type="hidden" name="transport_type" value="{{ transport_type }}">
 
+        <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
+            <label class="block text-sm font-bold text-blue-900 mb-2">📦 Тип оборудования</label>
+            <select name="equipment_id" required
+                    class="w-full border-blue-200 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                <option value="" disabled {% if not order.equipment_id %}selected{% endif %}>Выберите размер/тип...</option>
+                {% for eq in equipments %}
+                <option value="{{ eq.id }}" {% if order.equipment_id == eq.id %}selected{% endif %}>
+                    {{ eq.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
         <div class="space-y-4">
             <label class="block p-4 border-2 rounded-xl cursor-pointer hover:bg-blue-50 border-gray-200 has-[:checked]:border-blue-600">
                 <input type="radio" name="is_soc" value="false"  

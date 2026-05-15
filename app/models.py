@@ -71,6 +71,8 @@ class CargoOrder(Base):
     owner_id = Column(Integer, ForeignKey("users.id"))
     status = Column(String, default="draft")
     transport_type = Column(Enum(TransportType))
+    loading_date = Column(Date, nullable=True)
+    equipment_id = Column(Integer, ForeignKey("equipments.id"), nullable=True)
     is_soc = Column(Boolean, nullable=True, default=None)
     needs_return = Column(Boolean, nullable=True, default=None)
     return_instructions = Column(String, nullable=True)
@@ -95,6 +97,7 @@ class CargoOrder(Base):
     owner = relationship("User", back_populates="orders")
     containers = relationship("Container", back_populates="order", cascade="all, delete-orphan")
     items = relationship("GeneralCargoItem", back_populates="order", cascade="all, delete-orphan")
+    equipment = relationship("Equipment", back_populates="cargo_orders")
 
     # Pre-carriage (Экспорт / Пункт отправления)
     pre_carriage_required = Column(Boolean, default=False)
@@ -108,8 +111,9 @@ class CargoOrder(Base):
     on_carriage_required = Column(Boolean, default=False)
     on_carriage_address = Column(String, nullable=True)
     on_carriage_contact = Column(String, nullable=True)
-    on_carriage_date = Column(DateTime, nullable=True)
+    on_carriage_notes = Column(String, nullable=True)
     on_carriage_comment = Column(String, nullable=True)
+
 
 
 class Equipment(Base):
@@ -118,6 +122,7 @@ class Equipment(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False, index=True)
     description = Column(String, nullable=True)
+    cargo_orders = relationship("CargoOrder", back_populates="equipment")
 
 class Container(Base):
     __tablename__ = "containers"
@@ -127,8 +132,9 @@ class Container(Base):
     
     equipment_id = Column(Integer, ForeignKey("equipments.id"), nullable=False) # 20DC, 40HC и т.д.
     is_soc = Column(Boolean, default=False) # True - отправителя, False - линейный
-    weight_gross = Column(Float)
-    pieces = Column(Integer, nullable=False)
+    is_lcl = Column(Boolean, default=False)
+    weight_gross = Column(Float, nullable=True)
+    pieces = Column(Integer, nullable=True)
     cargo_description = Column(String)
     container_number = Column(String, nullable=True)
     valid_number = Column(Boolean, default=True)
@@ -148,6 +154,20 @@ class Container(Base):
 
     order = relationship("CargoOrder", back_populates="containers")
     equipment = relationship("Equipment")
+    items = relationship("CargoItem", back_populates="container", cascade="all, delete-orphan")
+
+class CargoItem(Base):
+    __tablename__ = "cargo_items"
+    
+    id = Column(Integer, primary_key=True)
+    container_id = Column(Integer, ForeignKey("containers.id", ondelete="CASCADE"))
+    
+    name = Column(String) # Наименование груза
+    pieces = Column(Integer) # Мест
+    weight_gross = Column(Float) # Вес
+    
+    container = relationship("Container", back_populates="items")
+
 
 class GeneralCargoItem(Base):
     __tablename__ = "general_cargo_items"
