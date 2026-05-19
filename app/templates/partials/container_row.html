@@ -137,40 +137,7 @@
     </td>
 </tr>
 
-<!-- Строка рефрижератора (скрыта по умолчанию) >
- {% set is_reefer = 'RF' in order.equipment.name %}
-<tr id="reefer-row-{{ row_id }}" 
-    class="bg-blue-50/50 {% if not is_reefer %}hidden{% endif %} reefer-params-row">
-    <td colspan="7" class="p-3 border-b border-gray-200">
-        <div class="flex flex-wrap items-center gap-4 text-xs">
-            <div class="flex items-center gap-2">
-                <span class="font-semibold text-blue-700 uppercase">🌡️ Режим:</span>
-                <input type="number" step="0.1" name="temperature[]" 
-                       value="{{ container.temperature if container and container.temperature != None else '' }}" 
-                       class="w-16 rounded border-gray-300 p-1">
-            </div>
-            
-            <label class="flex items-center gap-1">
-                <input type="checkbox" name="ventilation[]" value="{{ loop_index }}"
-                       {% if container and container.ventilation %}checked{% endif %}> Вент.
-            </label>
-
-            <label class="flex items-center gap-1">
-                <input type="checkbox" name="port_plug[]" value="{{ loop_index }}"
-                       {% if container and (container.port_plug or container.port_plug is none) %}checked{% endif %}> Порт
-            </label>
-
-            <input type="date" name="plug_start_date[]" 
-                   value="{{ container.plug_start_date if container and container.plug_start_date else '' }}"
-                   class="rounded border-gray-300 p-1">
-
-            <label class="flex items-center gap-1">
-                <input type="checkbox" name="vessel_plug[]" value="{{ loop_index }}"
-                       {% if container and (container.vessel_plug or container.vessel_plug is none) %}checked{% endif %}> Судно
-            </label>
-        </div>
-    </td>
-</tr-->
+<!-- строка рефки -->
 {% set is_reefer = 'RF' in order.equipment.name %}
 <tr id="reefer-row-{{ row_id }}" 
     class="bg-blue-50/50 {% if not is_reefer %}hidden{% endif %} reefer-params-row">
@@ -203,9 +170,9 @@
                 <input type="date" 
                     id="date-{{ row_id }}"
                     name="plug_start_date[]" 
-                    value="{{ container.plug_start_date if container and container.plug_start_date else order.loading_date }}"
-                    {% if not (container and (container.port_plug or container.port_plug is none)) %}disabled{% endif %}
-                    class="rounded border-gray-300 p-1 text-sm focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400">
+                    value="{{ container.plug_start_date if container and container.plug_start_date else '' }}"
+                    {% if not (container and (container.port_plug or container.port_plug is none)) %} readonly class="readOnly"{% endif %}
+                    class="rounded border-gray-300 p-1 text-sm focus:ring-blue-500 readOnly:bg-gray-100 readOnly:text-gray-400">
 
                 <div class="flex items-center gap-3 ml-2">
                     <label class="flex items-center gap-1.5 cursor-pointer">

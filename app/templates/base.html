@@ -13,34 +13,12 @@
 </head>
 <body class="bg-gray-100 min-h-screen">
     <nav class="bg-blue-600 p-4 text-white shadow-lg">
-        <!--div class="container mx-auto flex justify-between items-center">
-            <a href="/" class="font-bold text-xl">CargoFlow</a>
-            <div>
-                <button hx-post="/api/logout" hx-target="body" class="text-sm bg-red-500 px-3 py-1 rounded">Выйти</button>
-            </div>
-        </div-->
-        <!-- Слой загрузки -->
         <div id="global-loader" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/10 backdrop-blur-[1px]">
             <div class="bg-white p-4 rounded-xl shadow-lg flex items-center gap-3">
                 <div class="animate-spin h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full"></div>
                 <span class="text-sm font-medium">Обработка...</span>
             </div>
         </div>
-
-        <script>
-            // Для HTMX
-            document.body.addEventListener('htmx:beforeRequest', () => {
-                document.getElementById('global-loader').style.display = 'flex';
-            });
-            document.body.addEventListener('htmx:afterRequest', () => {
-                document.getElementById('global-loader').style.display = 'none';
-            });
-
-            // Для обычных форм
-            window.onbeforeunload = function() {
-                document.getElementById('global-loader').style.display = 'flex';
-            };
-        </script>
         <div class="flex items-center space-x-4">
             <button hx-get="/api/orders" 
                     hx-target="main" 
@@ -61,6 +39,20 @@
     <main id="main-content" class="container mx-auto mt-10 p-4">
         {% block content %}{% endblock %}
     </main>
+    <script>
+        // Для HTMX
+        document.body.addEventListener('htmx:beforeRequest', () => {
+            document.getElementById('global-loader').style.display = 'flex';
+        });
+        document.body.addEventListener('htmx:afterRequest', () => {
+            document.getElementById('global-loader').style.display = 'none';
+        });
+
+        // Для обычных форм
+        window.onbeforeunload = function() {
+            document.getElementById('global-loader').style.display = 'flex';
+        };
+    </script>
 
 </body>
 </html>

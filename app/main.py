@@ -25,12 +25,9 @@ templates = Jinja2Templates(directory="app/templates")
 def format_vladivostok_time(dt_utc):
     if not dt_utc:
         return ""
-    # База обычно отдает naive-время, принудительно ставим UTC
     if dt_utc.tzinfo is None:
         dt_utc = dt_utc.replace(tzinfo=ZoneInfo("UTC"))
-    # Переводим во Владивосток (Asia/Vladivostok)
     local_dt = dt_utc.astimezone(ZoneInfo("Asia/Vladivostok"))
-    # Форматируем в компактный вид
     return local_dt.strftime("%d.%m.%Y %H:%M")
 
 templates.env.filters["vlad_time"] = format_vladivostok_time
@@ -233,7 +230,6 @@ async def search_counterparties(
     )
     
     cps = result.scalars().all()
-    print(cps)
     options = "".join([f'<option value="{cp.name}">' for cp in cps])
     return HTMLResponse(content=options)
 
@@ -254,14 +250,12 @@ async def search_cp(request: Request, db: AsyncSession = Depends(get_db), curren
     result = await db.execute(query.limit(5))
     
     cps = result.scalars().all()
-    print(cps)
     # Возвращаем список, который при клике заполнит поля через hx-on
     return templates.TemplateResponse(request=request, name = "partials/cp_search_results.html", context={"cps": cps})
 
 
 @app.post("/api/orders")
 async def start_order(request: Request):
-    # Теперь этот эндпоинт просто отдает форму с правилами
     return templates.TemplateResponse(
         request=request,
         name="partials/step_0_rules.html",
@@ -289,7 +283,7 @@ async def init_order(
     today = date.today().isoformat()
     tomorrow = (date.today() + timedelta(days=1)).isoformat()
 
-    # Возвращаем Шаг 1 (как раньше делал start_order)
+    # Возвращаем Шаг 1
     return templates.TemplateResponse(
         request=request,
         name="partials/step_1.html",
@@ -309,11 +303,7 @@ async def check_type(
     
     if not order:
         raise HTTPException(status_code=404, detail="Заказ не найден")
-
-    # Обновляем общие поля для обоих типов
     order.transport_type = transport_type.upper()
-    
-    # Конвертируем строку из инпута в объект даты Python
     if loading_date:
         order.loading_date = datetime.strptime(loading_date, "%Y-%m-%d").date()
 
@@ -331,10 +321,14 @@ async def check_type(
                 "equipments": equipments
             }
         )
+    else:
+        await db.commit()
+        return await get_step_2_route(request, order_id, db)
     
-    # Логика для генгруза (уже обновлено выше)
-    await db.commit()
-    return await get_step_2_route(request, order_id, db)
+@app.get("/api/orders/{order_id}/step-2-general")
+async def get_step_2_route(request):
+    pass
+
 
 @app.patch("/api/orders/{order_id}/step-1")
 async def save_step_1(
@@ -434,7 +428,7 @@ async def save_step_2(
     if not order:
         raise HTTPException(status_code=404)
 
-    # 2. Обрабатываем контрагентов
+    # 2. Обрабатываем контрагентов, старая версия без полей cnee и shipper
     #order.shipper_id = await get_or_create_counterparty(shipper_name, current_user.id, db)
     #order.consignee_id = await get_or_create_counterparty(consignee_name, current_user.id, db)
     #order.notify_party_id = await get_or_create_counterparty(notify_name, current_user.id, db)
@@ -445,17 +439,11 @@ async def save_step_2(
     order.consignee_id = await sync_counterparty(db, current_user.id, 
         form.get("consignee_name"), form.get("consignee_inn"), 
         form.get("consignee_address"), form.get("consignee_contact"))
-    #order.notify_party_id = await sync_counterparty(db, current_user.id, 
-    #    form.get("notify_party_name"), form.get("notify_party_inn"), 
-    #    form.get("notify_party_address"), form.get("notify_party_contact"))
+    #старая версия для notify
     order.notify_party_id = await get_or_create_counterparty(notify_name, current_user.id, db)
-
-
-    # 3. Сохраняем порты
     order.pol_id = pol_id
     order.pod_id = pod_id
 
-    # 4. Сохраняем и обновляем, чтобы объект был "свежим" для шаблона
     await db.commit()
 
     result = await db.execute(
@@ -468,9 +456,6 @@ async def save_step_2(
     )
     order = result.scalar_one()
 
-    #await db.refresh(order)
-
-    # Определяем шаблон
     template_name = "partials/step_3_container.html" if order.transport_type == TransportType.CONTAINER else "partials/step_3_general.html"
     
     # Для контейнеров подтягиваем справочник оборудования
@@ -489,7 +474,6 @@ async def save_step_2(
             "current_step": "step-3"
         }
     )
-    #response.headers["HX-Push-Url"] = f"/api/orders/{order_id}/step-2"
     return response
 
 @app.get("/api/orders/{order_id}/add-container-row")
@@ -699,10 +683,8 @@ async def list_orders(
     result = await db.execute(
         select(CargoOrder)
         .options(
-            joinedload(CargoOrder.port_of_loading), # или как оно у тебя в моделях?
+            joinedload(CargoOrder.port_of_loading),
             joinedload(CargoOrder.port_of_discharge),
-            #joinedload(CargoOrder.shipper),
-            #joinedload(CargoOrder.consignee)
             selectinload(CargoOrder.containers).joinedload(Container.equipment)
         )
         .where(CargoOrder.owner_id == current_user.id)
@@ -725,9 +707,6 @@ async def get_step_1(
 ):
     result = await db.execute(
         select(CargoOrder)
-        #.options(
-        #    selectinload(CargoOrder.loading_date)
-        #)
         .where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id))
     order = result.scalars().first()
     if not order: raise HTTPException(404)

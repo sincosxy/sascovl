@@ -164,39 +164,53 @@
     <table class="cargo-table">
         <thead>
             <tr>
-                <th>№ Контейнера / Тип</th>
-                <th>Пломба / SOC</th>
-                <th>Вес брутто</th>
-                <th>Мест</th>
-                <th>Описание груза (Items)</th>
+                <th style="width: 20%;">№ Контейнера / Тип</th>
+                <th style="width: 15%;">Пломба / SOC</th>
+                <th style="width: 12%;">Вес брутто</th>
+                <th style="width: 8%;">Мест</th>
+                <th style="width: 45%;">Описание груза / Реф-режим</th>
             </tr>
         </thead>
         <tbody>
             {% for con in order.containers %}
             <tr>
-                <td><b>{{ con.container_number or 'TBN' }}</b><br>{{ con.equipment.name }}</td>
-                <td>{{ con.seal or '-' }}<br>{{ 'SOC' if con.is_soc else 'COC' }}</td>
-                <td style="text-align: center;">{{ "{:,.2f}".format(con.weight_gross or 0) }} kg</td>
+                <td>
+                    <b>{{ con.container_number or 'TBN' }}</b><br>
+                    <span style="font-size: 8pt; color: #444;">{{ con.equipment.name }}</span>
+                </td>
+                <td>
+                    {{ con.seal or '-' }}<br>
+                    <span style="font-size: 8pt;">{{ 'SOC' if con.is_soc else 'COC' }}</span>
+                </td>
+                <td style="text-align: right;">{{ "{:,.2f}".format(con.weight_gross or 0) }} kg</td>
                 <td style="text-align: center;">{{ con.pieces or 0 }}</td>
                 <td>
-                    {% if con.is_lcl and con.items %}
+                    {# Описание айтемов #}
+                    {% if con.items %}
                         {% for item in con.items %}
-                        <div style="border-bottom: 0.1pt solid #eee; margin-bottom: 2px;">
+                        <div style="border-bottom: 0.1pt solid #eee; margin-bottom: 2px; font-size: 8pt;">
                             • {{ item.name }}: {{ item.pieces }} мест / {{ item.weight_gross }} kg
                         </div>
                         {% endfor %}
                     {% else %}
                         {{ con.cargo_description or '-' }}
                     {% endif %}
+
+                    {# БЛОК РЕФ-ПАРАМЕТРОВ #}
+                    {% if con.equipment and 'RF' in con.equipment.name %}
+                    <div style="margin-top: 5px; padding: 4px; background-color: #f0f7ff; border: 0.5pt solid #d1e3f8; font-size: 8pt;">
+                        <b>🌡️ Режим:</b> {{ con.temperature if con.temperature is not none else '___' }}°C | 
+                        <b>Вент:</b> {{ 'ОТКР' if con.ventilation else 'ЗАКР' }} |
+                        <b>Подкл:</b> 
+                        {% if con.port_plug %}Порт{% endif %}
+                        {% if con.vessel_plug %} Судно{% endif %}
+                        {% if con.plug_start_date %}
+                            (с {{ con.plug_start_date.strftime('%d.%m.%Y') }})
+                        {% endif %}
+                    </div>
+                    {% endif %}
                 </td>
             </tr>
-            {% if 'RF' in con.equipment.name %}
-            <tr style="background: #f0f7ff;">
-                <td colspan="5" style="font-size: 8pt;">
-                    ❄️ <b>Реф-режим:</b> {{ con.temperature }}°C | Вент: {{ 'Да' if con.ventilation else 'Нет' }} | Подключение: {{ con.plug_start_date.strftime('%d.%m.%Y') if con.plug_start_date else '-' }}
-                </td>
-            </tr>
-            {% endif %}
             {% endfor %}
         </tbody>
     </table>
