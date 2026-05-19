@@ -1,3 +1,30 @@
+<style>
+    .htmx-indicator {
+        display: none;
+    }
+    .htmx-request .htmx-indicator {
+        display: block;
+    }
+    .htmx-request.htmx-indicator {
+        display: block;
+    }
+
+    /* Стили для полоски загрузки */
+    .progress-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 3px;
+        width: 0%;
+        background-color: #3b82f6; /* blue-500 */
+        z-index: 9999;
+        transition: width 0.3s ease;
+    }
+    .htmx-request .progress-bar {
+        width: 40%; /* Анимация начала загрузки */
+    }
+</style>
+<div class="progress-bar htmx-indicator"></div>
 <nav class="flex items-center justify-center space-x-4 mb-8 text-sm font-medium">
     {% set steps = [
         ('step-1', '1', 'Тип'),
