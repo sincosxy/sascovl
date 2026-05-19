@@ -1,6 +1,7 @@
 {% set row_id = range(1, 99999) | random if not container else container.id %}
 {% set container_idx = loop.index0 if loop is defined else loop_index %}
 
+
 <!-- Основная строка -->
 
 <tr class="hover:bg-gray-50 transition-colors border-t border-gray-200" id="main-row-{{ row_id }}">
@@ -72,7 +73,7 @@
             value="{{ container.pieces if container else '' }}">
     </td>
     <td class="p-2">
-        <input type="text" name="cargo_description[]" placeholder="..." class="w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
+        <input id="cargo-{{ row_id }}" type="text" name="cargo_description[]" placeholder="..." class="w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
             value="{{ container.cargo_description if container else '' }}">
     </td>
     <!--td class="p-2">
@@ -136,7 +137,7 @@
     </td>
 </tr>
 
-<!-- Строка рефрижератора (скрыта по умолчанию) -->
+<!-- Строка рефрижератора (скрыта по умолчанию) >
  {% set is_reefer = 'RF' in order.equipment.name %}
 <tr id="reefer-row-{{ row_id }}" 
     class="bg-blue-50/50 {% if not is_reefer %}hidden{% endif %} reefer-params-row">
@@ -169,6 +170,65 @@
             </label>
         </div>
     </td>
+</tr-->
+{% set is_reefer = 'RF' in order.equipment.name %}
+<tr id="reefer-row-{{ row_id }}" 
+    class="bg-blue-50/50 {% if not is_reefer %}hidden{% endif %} reefer-params-row">
+    <td colspan="7" class="p-4 border-b border-gray-200">
+        <div class="flex flex-wrap items-center gap-6 text-xs">
+            
+            {# Блок Температуры #}
+            <div class="flex items-center gap-2">
+                <span class="font-bold text-blue-700 uppercase whitespace-nowrap">🌡️ Режим:</span>
+                <input type="number" step="1" name="temperature[]" 
+                       value="{{ container.temperature if container and container.temperature is not none else '' }}" 
+                       placeholder="°C"
+                       class="w-20 rounded border-gray-300 p-1 text-sm focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            
+            {# Вентиляция #}
+            <label class="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" name="ventilation[]" value="{{ loop_index }}"
+                       {% if container and container.ventilation %}checked{% endif %}
+                       class="rounded text-blue-600 border-gray-300">
+                <span class="font-medium">Вент.</span>
+            </label>
+
+            <div class="h-6 w-px bg-gray-300 mx-2"></div> {# Разделитель #}
+
+            {# Объединенный блок Подключение #}
+            <div class="flex items-center gap-3 bg-white/50 p-1.5 px-3 rounded-md border border-blue-100 shadow-sm">
+                <span class="font-bold text-blue-700 uppercase whitespace-nowrap">🔌 Подключение:</span>
+                
+                <input type="date" 
+                    id="date-{{ row_id }}"
+                    name="plug_start_date[]" 
+                    value="{{ container.plug_start_date if container and container.plug_start_date else order.loading_date }}"
+                    {% if not (container and (container.port_plug or container.port_plug is none)) %}disabled{% endif %}
+                    class="rounded border-gray-300 p-1 text-sm focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400">
+
+                <div class="flex items-center gap-3 ml-2">
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" 
+                            name="port_plug[]" 
+                            value="{{ loop_index }}"
+                            onchange="toggleDateInput(this, 'date-{{ row_id }}')"
+                            {% if container and (container.port_plug or container.port_plug is none) %}checked{% endif %}
+                            class="rounded text-blue-600 border-gray-300">
+                        <span>Порт</span>
+                    </label>
+
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" name="vessel_plug[]" value="{{ loop_index }}"
+                               {% if container and (container.vessel_plug or container.vessel_plug is none) %}checked{% endif %}
+                               class="rounded text-blue-600 border-gray-300">
+                        <span>Судно</span>
+                    </label>
+                </div>
+            </div>
+
+        </div>
+    </td>
 </tr>
 
 <script>
@@ -184,23 +244,47 @@ function addCargoItem(rowId, containerIdx) {
     container.insertAdjacentHTML('beforeend', html);
 }
 
+function toggleDateInput(checkbox, dateInputId) {
+    const dateInput = document.getElementById(dateInputId);
+    //const dateValue = dateInput.value;
+    if (dateInput) {
+        dateInput.readOnly = !checkbox.checked;
+        
+        // Опционально: очищать дату при снятии галки
+        if (!checkbox.checked) {
+            dateInput.value = "";
+            dateInput.classList.add('bg-gray-100');
+        } else {
+            dateInput.classList.remove('bg-gray-100');
+            dateInput.value = document.getElementById('step-container').dataset.loadingDate;
+        }
+    }
+}
+
 function toggleLclMode(rowId, checkbox) {
     const weightInput = document.getElementById(`total-weight-${rowId}`);
     const piecesInput = document.getElementById(`total-pieces-${rowId}`);
     const lclWrapper = document.getElementById(`lcl-wrapper-${rowId}`);
+    const cargo = document.getElementById(`cargo-${rowId}`);
 
     if (checkbox.checked) {
         weightInput.readOnly = true;
         piecesInput.readOnly = true;
+        cargo.value = 'Сборный';
+        cargo.readOnly = true;
         weightInput.classList.add('bg-gray-100');
         piecesInput.classList.add('bg-gray-100');
+        cargo.classList.add('bg-gray-100');
         lclWrapper.classList.remove('hidden');
         calculateTotals(rowId); // Считаем сразу при включении
     } else {
         weightInput.readOnly = false;
         piecesInput.readOnly = false;
+        cargo.value = '';
+        cargo.readOnly = false;
         weightInput.classList.remove('bg-gray-100');
         piecesInput.classList.remove('bg-gray-100');
+        cargo.classList.remove('bg-gray-100');
         lclWrapper.classList.add('hidden');
     }
 }

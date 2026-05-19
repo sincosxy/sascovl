@@ -1,4 +1,5 @@
-<div id="step-container" class="max-w-5xl mx-auto p-6 bg-white shadow-lg rounded-lg">
+{% set dateload = order.loading_date %}
+<div id="step-container" class="max-w-5xl mx-auto p-6 bg-white shadow-lg rounded-lg" data-loading-date="{{ dateload }}">
     <h2 class="text-2xl font-bold mb-6 text-gray-800 border-b pb-2">Шаг 3: Детализация контейнеров</h2>
     {% include 'partials/wizard_nav.html' %}
 
@@ -32,6 +33,7 @@
                         <th class="p-3 border-b">Вес (кг)</th>
                         <th class="p-3 border-b">Мест</th>
                         <th class="p-3 border-b">Груз</th>
+                        <th class=""p-3 border-b">Сборный</th>
                         <th class="p-3 border-b"></th>
                     </tr>
                 </thead>

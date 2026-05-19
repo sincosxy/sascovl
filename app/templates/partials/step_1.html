@@ -12,7 +12,7 @@
                 📅 Предполагаемая дата погрузки
             </label>
             <input type="date" name="loading_date" 
-                   value="{{ default_date }}"
+                   value="{{ order.loading_date or default_date  }}"
                    min="{{ today }}"
                    class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
         </div>

@@ -1,14 +1,19 @@
 <div id="step-container" class="max-w-4xl mx-auto p-8 bg-white shadow-2xl rounded-xl border border-gray-100">
     <div class="flex justify-between items-start border-b pb-6 mb-6">
+        {% if order.status == 'draft' %}
         <div>
             <h2 class="text-3xl font-extrabold text-gray-900">Проверка заказа #{{ order.id }}</h2>
             <p class="text-gray-500 mt-1">Пожалуйста, проверьте данные перед финальной отправкой</p>
         </div>
-        {% if order.status == 'draft' %}
+        
         <div class="bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-bold">
             Черновик
         </div>
         {% else %}
+        <div>
+            <h2 class="text-3xl font-extrabold text-gray-900">Заказ #{{ order.id }}</h2>
+            <p class="text-gray-500 mt-1">Заказ передан экспедитору.</p>
+        </div>
         <div class="bg-blue-50 text-grenn-700 px-4 py-2 rounded-full text-sm font-bold">
             Подтвержден
         </div>
@@ -19,7 +24,7 @@
         <!-- Левая колонка: Маршрут и Контрагенты -->
         <div class="space-y-6">
             <section>
-                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Логистика</h3>
+                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Маршрут</h3>
                 <div class="bg-gray-50 p-4 rounded-lg border border-gray-100">
                     <div class="flex items-center gap-2 mb-3">
                         <span class="text-xl">🚢</span>

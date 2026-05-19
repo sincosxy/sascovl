@@ -445,9 +445,10 @@ async def save_step_2(
     order.consignee_id = await sync_counterparty(db, current_user.id, 
         form.get("consignee_name"), form.get("consignee_inn"), 
         form.get("consignee_address"), form.get("consignee_contact"))
-    order.notify_party_id = await sync_counterparty(db, current_user.id, 
-        form.get("notify_party_name"), form.get("notify_party_inn"), 
-        form.get("notify_party_address"), form.get("notify_party_contact"))
+    #order.notify_party_id = await sync_counterparty(db, current_user.id, 
+    #    form.get("notify_party_name"), form.get("notify_party_inn"), 
+    #    form.get("notify_party_address"), form.get("notify_party_contact"))
+    order.notify_party_id = await get_or_create_counterparty(notify_name, current_user.id, db)
 
 
     # 3. Сохраняем порты
@@ -609,91 +610,7 @@ async def save_step_3(
         context={"order_id": order_id, "order": order, "current_step": "step-4"}
     )
 
-@app.patch("/api/orders/{order_id}/step-33")
-async def save_step_3(
-    order_id: int,
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    form_data = await request.form()
-    
-    result = await db.execute(
-        select(CargoOrder)
-        .options(
-            joinedload(CargoOrder.port_of_loading), 
-            joinedload(CargoOrder.port_of_discharge),
-            joinedload(CargoOrder.containers)
-        )
-        .where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
-    )
-    order = result.scalars().first()
-    
-    if not order:
-        raise HTTPException(status_code=404, detail="Заказ не найден")
 
-
-    eq_ids = form_data.getlist("equipment_id[]")
-    numbers = form_data.getlist("container_number[]")
-    seals = form_data.getlist("seal[]")
-    weights = form_data.getlist("weight_gross[]")
-    pieces = form_data.getlist("pieces[]")
-    descriptions = form_data.getlist("cargo_description[]")
-    
-    soc_indices = form_data.getlist("is_soc[]")
-    vent_indices = form_data.getlist("ventilation[]")
-    port_indices = form_data.getlist("port_plug[]")
-    vessel_indices = form_data.getlist("vessel_plug[]")
-    
-    temps = form_data.getlist("temperature[]")
-    plug_dates = form_data.getlist("plug_start_date[]")
-
-    await db.execute(delete(Container).where(Container.order_id == order_id))
-
-    for i in range(len(eq_ids)):
-        row_marker = str(i)
-        
-        def get_val(lst, idx, default=None):
-            return lst[idx] if idx < len(lst) else default
-
-        new_con = Container(
-            order_id=order_id,
-            equipment_id=int(eq_ids[i]),
-            is_soc=order.is_soc, #row_marker in soc_indices,
-            container_number=get_val(numbers, i),
-            valid_number=validate_container_number(get_val(numbers, i)),
-            seal=get_val(seals, i),
-            weight_gross=float(get_val(weights, i)) if get_val(weights, i) else 0.0,
-            pieces=int(get_val(pieces, i)) if get_val(pieces, i) else 0,
-            cargo_description=get_val(descriptions, i),
-            
-            # Реф-поля
-            temperature=float(get_val(temps, i)) if get_val(temps, i) else None,
-            ventilation=row_marker in vent_indices,
-            port_plug=row_marker in port_indices,
-            vessel_plug=row_marker in vessel_indices,
-        )
-        
-        # Обработка даты
-        date_str = get_val(plug_dates, i)
-        if date_str:
-            try:
-                new_con.plug_start_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-            except ValueError:
-                new_con.plug_start_date = None
-
-        db.add(new_con)
-
-    await db.commit()
-    
-    # Освежаем объект для корректного отображения в success-шаблоне
-    await db.refresh(order)
-
-    return templates.TemplateResponse(
-        request=request,
-        name="partials/step_4_trucking.html",#"partials/order_success.html",
-        context={"order_id": order_id, "order": order, "current_step": "step-4"}
-    )
 
 @app.patch("/api/orders/{order_id}/step-4")
 async def save_step_4(
@@ -795,7 +712,12 @@ async def get_step_1(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    result = await db.execute(select(CargoOrder).where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id))
+    result = await db.execute(
+        select(CargoOrder)
+        #.options(
+        #    selectinload(CargoOrder.loading_date)
+        #)
+        .where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id))
     order = result.scalars().first()
     if not order: raise HTTPException(404)
 
