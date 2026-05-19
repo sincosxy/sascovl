@@ -457,7 +457,18 @@ async def save_step_2(
 
     # 4. Сохраняем и обновляем, чтобы объект был "свежим" для шаблона
     await db.commit()
-    await db.refresh(order)
+
+    result = await db.execute(
+        select(CargoOrder)
+        .options(
+            selectinload(CargoOrder.containers).selectinload(Container.items), # если есть items
+            selectinload(CargoOrder.equipment) # подгружаем тип оборудования для проверки 'RF'
+        )
+        .where(CargoOrder.id == order_id)
+    )
+    order = result.scalar_one()
+
+    #await db.refresh(order)
 
     # Определяем шаблон
     template_name = "partials/step_3_container.html" if order.transport_type == TransportType.CONTAINER else "partials/step_3_general.html"
