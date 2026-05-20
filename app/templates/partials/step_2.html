@@ -56,7 +56,7 @@
                 <div class="cp-group relative">
                     <label class="block text-xs font-bold text-gray-500 uppercase">Отправитель</label>
                     <input type="text" name="shipper_name" autocomplete="off"
-                        hx-get="/api/search/counterparty" hx-trigger="keyup changed delay:300ms, focus" hx-target="next .results"
+                        hx-get="/api/search/counterparty" hx-trigger="keyup changed delay:500ms, focus" hx-target="next .results"
                         value="{{ order.shipper.name if order.shipper else '' }}" class="w-full border rounded p-2">
                     <div class="results"></div>
                     
@@ -69,7 +69,7 @@
                 <div class="cp-group relative">
                     <label class="block text-xs font-bold text-gray-500 uppercase">Получатель</label>
                     <input type="text" name="consignee_name" autocomplete="off"
-                        hx-get="/api/search/counterparty" hx-trigger="keyup changed delay:300ms, focus" hx-target="next .results"
+                        hx-get="/api/search/counterparty" hx-trigger="keyup changed delay:500ms, focus" hx-target="next .results"
                         value="{{ order.consignee.name if order.consignee else '' }}" class="w-full border rounded p-2">
                     <div class="results"></div>
                     

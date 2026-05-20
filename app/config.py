@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+    DADA: str
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod

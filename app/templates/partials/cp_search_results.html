@@ -1,4 +1,4 @@
-<div class="absolute z-50 w-full bg-white border shadow-xl rounded-md mt-1">
+<!--div class="absolute z-50 w-full bg-white border shadow-xl rounded-md mt-1">
     {% for cp in cps %}
     <div class="p-2 hover:bg-blue-50 cursor-pointer border-b last:border-0"
          hx-on:click="
@@ -12,4 +12,50 @@
         <div class="text-[10px] text-gray-500">ИНН: {{ cp.inn or '—' }}</div>
     </div>
     {% endfor %}
+</div-->
+<div class="absolute z-50 w-full bg-white border shadow-xl rounded-md mt-1 max-h-64 overflow-y-auto">
+    {# --- СВОИ КОНТРАГЕНТЫ ИЗ БАЗЫ --- #}
+    {% for cp in cps %}
+    <div class="p-2 hover:bg-blue-50 cursor-pointer border-b last:border-0"
+         hx-on:click="
+            let row = this.closest('.cp-group');
+            row.querySelector('[name$=_name]').value = '{{ cp.name }}';
+            row.querySelector('[name$=_inn]').value = '{{ cp.inn or '' }}';
+            row.querySelector('[name$=_address]').value = '{{ cp.address or '' }}';
+            row.querySelector('[name$=_contact]').value = '{{ cp.contact_info or '' }}';
+            this.closest('.absolute').remove();">
+        <div class="font-bold text-sm text-gray-800">{{ cp.name }}</div>
+        <div class="text-[10px] text-blue-600 flex justify-between">
+            <span>ИНН: {{ cp.inn or '—' }}</span>
+            <span class="italic text-gray-400">в базе</span>
+        </div>
+    </div>
+    {% endfor %}
+
+    {# --- НОВЫЕ ИЗ DADATA --- #}
+    {% if external_cps %}
+        <div class="bg-gray-50 px-2 py-1 text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b">
+            Найти в сети (DaData)
+        </div>
+        {% for ecp in external_cps %}
+        <div class="p-2 hover:bg-green-50 cursor-pointer border-b last:border-0"
+             hx-on:click="
+                let row = this.closest('.cp-group');
+                row.querySelector('[name$=_name]').value = '{{ ecp.name }}';
+                row.querySelector('[name$=_inn]').value = '{{ ecp.inn }}';
+                row.querySelector('[name$=_address]').value = '{{ ecp.address }}';
+                {# Для новых можно подставить подписанта в поле контакта #}
+                row.querySelector('[name$=_contact]').value = '{{ ecp.raw_data.management.name if ecp.raw_data.management else '' }}';
+                this.closest('.absolute').remove();">
+            <div class="font-bold text-sm text-green-700">{{ ecp.name }}</div>
+            <div class="text-[10px] text-gray-500">
+                ИНН: {{ ecp.inn }} • {{ ecp.address[:50] }}{% if ecp.address|length > 50 %}...{% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    {% if not cps and not external_cps %}
+    <div class="p-4 text-sm text-gray-500 text-center">Ничего не найдено</div>
+    {% endif %}
 </div>

@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Request, Response, Form
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm 
 from app.helpers import validate_container_number
-from app.db import engine, Base, get_db
+from app.db import engine, Base, get_db, dadatoken
 from sqlalchemy import select, delete  
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
@@ -12,7 +12,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
 from typing import List
 from datetime import datetime, date, timedelta
-
+import httpx
 from xhtml2pdf import pisa
 from io import BytesIO
 
@@ -233,8 +233,53 @@ async def search_counterparties(
     options = "".join([f'<option value="{cp.name}">' for cp in cps])
     return HTMLResponse(content=options)
 
-
 @app.get("/api/search/counterparty")
+async def search_cp(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    search_query = next(iter(request.query_params.values()), "").strip()
+    
+    # 1. Ищем своих в БД
+    query = select(Counterparty).where(Counterparty.user_id == current_user.id)
+    if search_query:
+        query = query.where(Counterparty.name.ilike(f"%{search_query}%"))
+        query = query.order_by(Counterparty.use_count.desc())
+    else:
+        query = query.order_by(Counterparty.use_count.desc(), Counterparty.last_use.desc())
+    
+    db_result = await db.execute(query.limit(5))
+    local_cps = db_result.scalars().all()
+
+    # 2. Ищем внешних в DaData (только если есть поисковый запрос)
+    external_cps = []
+    if search_query and len(search_query) > 2: # Не ищем по 1-2 буквам
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/party",
+                    headers={
+                        "Authorization": f"Token {dadatoken}",
+                        "Content-Type": "application/json"
+                    },
+                    json={"query": search_query, "count": 3}
+                )
+                if response.status_code == 200:
+                    suggestions = response.json().get("suggestions", [])
+                    # Форматируем под твою модель, чтобы шаблону было удобно
+                    print(f"Найдено в DaData: {len(suggestions)}") 
+                    for s in suggestions:
+                        external_cps.append({
+                            "is_external": True, # Флаг, что это из сети
+                            "name": s["value"],
+                            "inn": s["data"]["inn"],
+                            "address": s["data"]["address"]["value"],
+                            "raw_data": s["data"] # Для hx-on
+                        })
+        except Exception as e:
+            print(f"DaData error: {e}")
+
+    return templates.TemplateResponse(request=request, name = "partials/cp_search_results.html", context={"cps": local_cps, "external_cps": external_cps})
+    
+
+@app.get("/api/search/counterpartyold")
 async def search_cp(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     search_query = next(iter(request.query_params.values()), "")
     query = select(Counterparty).where(Counterparty.user_id == current_user.id)
