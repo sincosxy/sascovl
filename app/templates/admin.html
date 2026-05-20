@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{#% extends "base.html" %#}
 
 {% block content %}
 <div class="max-w-4xl mx-auto">
@@ -7,7 +7,7 @@
         <a href="/" class="text-blue-600 hover:underline">← На главную</a>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-gap-12 divide-y md:divide-y-0 md:divide-x divide-gray-200">
         <!-- Форма создания юзера -->
         <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
             <h2 class="text-xl font-semibold mb-4 text-gray-700">Создать нового клиента</h2>
@@ -63,11 +63,12 @@
                 <li>• Все созданные пользователи по умолчанию имеют роль <b>User</b>.</li>
                 <li>• Пользователи сразу могут заходить в кабинет под своими данными.</li>
                 <li>• Пароли хешируются алгоритмом <b>Bcrypt</b>.</li>
+                <li>• После добавления компании, обновите страницу, чтобы данные подгрузились в листбокс.</li>
             </ul>
         </div>
     </div>
 </div>
-
+<br>
 <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
     <h2 class="text-xl font-semibold mb-6 text-gray-700">Регистрация компании</h2>
     
