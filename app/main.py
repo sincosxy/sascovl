@@ -233,6 +233,65 @@ async def search_counterparties(
     options = "".join([f'<option value="{cp.name}">' for cp in cps])
     return HTMLResponse(content=options)
 
+@app.get("/api/admin/search-company-dadata")
+async def search_company_dadata(request: Request):
+    query = next(iter(request.query_params.values()), "").strip()
+    if len(query) < 3:
+        return HTMLResponse("")
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            "https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/party",
+            headers={"Authorization": f"Token {dadatoken}", "Content-Type": "application/json"},
+            json={"query": query, "count": 5}
+        )
+    
+    suggestions = resp.json().get("suggestions", []) if resp.status_code == 200 else []
+    
+    return templates.TemplateResponse(request=request, name="company_search_results.html", context={"suggestions": suggestions})
+
+@app.post("/api/admin/create-company")
+async def create_company(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.role not in [UserRole.ADMIN, UserRole.OPERATOR]:
+        return HTMLResponse('<span class="text-red-500">Доступ запрещен</span>', status_code=403)
+
+    form = await request.form()
+    inn = form.get("inn")
+
+    # Проверка на дубликат (если ИНН указан)
+    if inn:
+        existing = await db.execute(select(Company).where(Company.inn == inn))
+        if existing.scalars().first():
+            return HTMLResponse('<span class="text-amber-500">Компания с таким ИНН уже существует</span>')
+
+    # Создаем объект компании, мапим поля из формы на модель
+    new_company = Company(
+        name=form.get("name"),
+        fullname=form.get("fullname"),
+        inn=form.get("inn"),
+        kpp=form.get("kpp"),
+        ogrn=form.get("ogrn"),
+        address1=form.get("address1"),
+        tel1=form.get("tel1"),
+        email1=form.get("email1"),
+        bik=form.get("bik"),
+        ks=form.get("ks"),
+        rs=form.get("rs")
+    )
+    
+    db.add(new_company)
+    await db.commit()
+    
+    return HTMLResponse(
+        '<div class="p-2 bg-green-100 text-green-700 rounded text-center font-bold">'
+        'Компания добавлена успешно!'
+        '</div>'
+    )
+
 @app.get("/api/search/address")
 async def search_address(request: Request):
     #query = request.query_params.get("q", "").strip()

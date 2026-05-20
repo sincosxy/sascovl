@@ -1,0 +1,22 @@
+<div class="absolute z-50 w-full bg-white border shadow-xl rounded-md mt-1 max-h-80 overflow-y-auto">
+    {% for s in suggestions %}
+    <div class="p-3 hover:bg-blue-50 cursor-pointer border-b last:border-0"
+         hx-on:click="
+            let form = this.closest('form');
+            form.querySelector('[name=name]').value = '{{ s.value }}';
+            form.querySelector('[name=fullname]').value = '{{ s.data.name.full_with_opf or '' }}';
+            form.querySelector('[name=inn]').value = '{{ s.data.inn or '' }}';
+            form.querySelector('[name=kpp]').value = '{{ s.data.kpp or '' }}';
+            form.querySelector('[name=ogrn]').value = '{{ s.data.ogrn or '' }}';
+            form.querySelector('[name=address1]').value = '{{ s.data.address.value or '' }}';
+            // Email и телефон Дадата отдает не всегда в общем поиске, но если есть - подтянем
+            form.querySelector('[name=email1]').value = '{{ s.data.email or '' }}';
+            form.querySelector('[name=tel1]').value = '{{ s.data.phones or '' }}';
+            this.closest('.absolute').remove();">
+        
+        <div class="font-bold text-sm text-blue-900">{{ s.value }}</div>
+        <div class="text-[10px] text-gray-500">ИНН: {{ s.data.inn }} | ОГРН: {{ s.data.ogrn }}</div>
+        <div class="text-[10px] text-gray-400 truncate">{{ s.data.address.value }}</div>
+    </div>
+    {% endfor %}
+</div>
