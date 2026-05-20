@@ -3,7 +3,9 @@ from sqlalchemy.orm import DeclarativeBase
 from app.config import settings # Мы его уже создали, пусть живет в core
 
 engine = create_async_engine(settings.DATABASE_URL)
+
 dadatoken = settings.DADA
+
 SessionLocal = async_sessionmaker(autoflush=False, bind=engine, class_=AsyncSession, expire_on_commit=False)
 
 class Base(DeclarativeBase):

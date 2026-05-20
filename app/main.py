@@ -233,6 +233,34 @@ async def search_counterparties(
     options = "".join([f'<option value="{cp.name}">' for cp in cps])
     return HTMLResponse(content=options)
 
+@app.get("/api/search/address")
+async def search_address(request: Request):
+    #query = request.query_params.get("q", "").strip()
+    #query = request.query_params.get("pre_carriage_address", "").strip()
+    query = next(iter(request.query_params.values()), "").strip()
+    if not query or len(query) < 3:
+        return HTMLResponse("")
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            "https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/address",
+            headers={"Authorization": f"Token {dadatoken}", "Content-Type": "application/json"},
+            json={"query": query, "count": 5}
+        )
+        suggestions = resp.json().get("suggestions", []) if resp.status_code == 200 else []
+
+    # Возвращаем простой список подсказок
+    html = '<div class="absolute z-50 w-full bg-white border shadow-xl rounded-md mt-1">'
+    for s in suggestions:
+        html += f'''
+        <div class="p-2 hover:bg-blue-50 cursor-pointer border-b text-sm"
+             hx-on:click="this.closest('.address-group').querySelector('input').value = '{s['value']}'; this.parentElement.remove();">
+            {s['value']}
+        </div>
+        '''
+    html += '</div>'
+    return HTMLResponse(html)
+
 @app.get("/api/search/counterparty")
 async def search_cp(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     search_query = next(iter(request.query_params.values()), "").strip()
