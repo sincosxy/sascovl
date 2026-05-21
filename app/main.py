@@ -127,7 +127,7 @@ async def admin_create_user(
     email: str = Form(...),
     password: str = Form(...),
     full_name: str = Form(None),
-    company_id: int = Form(None),
+    company_id: int = Form(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
