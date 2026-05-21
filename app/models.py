@@ -19,6 +19,7 @@ class User(Base):
     role = Column(Enum(UserRole), default=UserRole.USER)
     orders = relationship("CargoOrder", back_populates="owner")
     company = relationship("Company")
+    is_active = Column(Boolean, default=True)
 
 class Company(Base):
     __tablename__ = "companies"
@@ -37,6 +38,7 @@ class Company(Base):
     bik = Column(String, unique=False, nullable=True)
     ks = Column(String, unique=False, nullable=True)
     rs = Column(String, unique=False, nullable=True)
+    is_deleted = Column(Boolean, default=False)
 
 
 

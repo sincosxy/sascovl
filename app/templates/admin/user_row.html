@@ -1,0 +1,28 @@
+{% if  user.is_active %}
+<tr class="border-b transition-colors hover:bg-gray-50" id="user-{{ user.id }}">
+    <td class="py-3 px-2">
+        <div class="font-medium text-gray-800">{{ user.name or 'Без имени' }}</div>
+        <div class="text-[10px] text-gray-400 font-mono">{{ user.email }}</div>
+    </td>
+    <td class="py-3 px-2">
+        <span class="px-2 py-1 rounded-full text-[10px] font-bold {{ 'bg-purple-100 text-purple-700' if user.role.value == 'admin' else 'bg-blue-100 text-blue-700' }}">
+            {{ user.role.value }}
+        </span>
+    </td>
+    <td class="py-3 px-2 text-gray-500 text-xs">
+        {{ user.company.name if user.company else '—' }}
+    </td>
+    <td class="py-3 px-2 text-right space-x-2">
+        <button hx-get="/api/admin/edit-user-form/{{ user.id }}" 
+                hx-target="#admin-modal-content"
+                onclick="document.getElementById('admin-modal').classList.remove('hidden')"
+                class="text-blue-600 hover:underline text-sm font-semibold">Правка</button>
+        
+        <button hx-delete="/api/admin/delete-user/{{ user.id }}"
+                hx-confirm="Удалить доступ для {{ user.email }}?"
+                hx-target="#user-{{ user.id }}"
+                hx-swap="outerHTML"
+                class="text-red-400 hover:text-red-600 text-sm">✕</button>
+    </td>
+</tr>
+{% endif %}

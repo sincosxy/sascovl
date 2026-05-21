@@ -1,0 +1,117 @@
+{#% extends "base.html" %#}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4">
+    <!-- Заголовок -->
+    <div class="flex justify-between items-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-800">Управление системой</h1>
+        <a href="/" class="text-blue-600 hover:underline">← На главную</a>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- ЛЕВАЯ КОЛОНКА (Компании и Пользователи) -->
+        <div class="lg:col-span-2 space-y-8">
+            
+            <!-- Блок Компаний -->
+            <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-gray-700 font-bold">Организации</h2>
+                    <button hx-get="/api/admin/create-company-form" 
+                            hx-target="#admin-modal-content"
+                            onclick="document.getElementById('admin-modal').classList.remove('hidden')"
+                            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition shadow-sm">
+                        + Добавить компанию
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead>
+                            <tr class="border-b text-gray-400 uppercase text-[10px] tracking-wider">
+                                <th class="pb-3">Название / ИНН</th>
+                                <th class="pb-3 text-right">Действие</th>
+                            </tr>
+                        </thead>
+                        <tbody id="companies-list">
+                            {% for company in companies %}
+                                {% include "admin/company_row.html" %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Блок Пользователей -->
+            <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-gray-700 font-bold">Доступы пользователей</h2>
+                    <button hx-get="/api/admin/create-user-form" 
+                            hx-target="#admin-modal-content"
+                            onclick="document.getElementById('admin-modal').classList.remove('hidden')"
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition shadow-sm">
+                        + Новый пользователь
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead>
+                            <tr class="border-b text-gray-400 uppercase text-[10px] tracking-wider">
+                                <th class="pb-3">Имя / Email</th>
+                                <th class="pb-3">Роль</th>
+                                <th class="pb-3">Компания</th>
+                                <th class="pb-3 text-right text-red-500">Удалить</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-list">
+                            {% for user in users %}
+                                {% include "admin/user_row.html" %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ПРАВАЯ КОЛОНКА (Инфо-блок) -->
+        <div class="lg:col-span-1">
+            <div class="bg-blue-50 p-6 rounded-xl border border-blue-100 sticky top-4">
+                <h2 class="text-xl font-semibold mb-4 text-blue-800">Справка</h2>
+                <ul class="space-y-4 text-blue-700 text-sm">
+                    <li class="flex gap-2">
+                        <span class="font-bold">•</span>
+                        <span>При создании компании можно использовать <b>автопоиск DaData</b> по названию или ИНН.</span>
+                    </li>
+                    <li class="flex gap-2">
+                        <span class="font-bold">•</span>
+                        <span>Пароли пользователей хранятся в <b>зашифрованном виде</b> и не могут быть восстановлены в чистом виде (только сброс).</span>
+                    </li>
+                    <li class="flex gap-2">
+                        <span class="font-bold">•</span>
+                        <span><b>Мягкое удаление:</b> компании не удаляются из базы физически, а помечаются флагом <code>is_deleted</code>.</span>
+                    </li>
+                </ul>
+                
+                <div class="mt-8 pt-6 border-t border-blue-200">
+                    <p class="text-xs text-blue-500">Статус системы: <span class="text-green-600 font-bold">Online</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно (остается без изменений) -->
+<div id="admin-modal" class="hidden fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="bg-white p-8 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative mx-4">
+        <button onclick="document.getElementById('admin-modal').classList.add('hidden')" 
+                class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-2xl">×</button>
+        <div id="admin-modal-content"></div>
+    </div>
+</div>
+
+<script>
+    document.body.addEventListener('closeModal', function() {
+        const modal = document.getElementById('admin-modal');
+        if (modal) modal.classList.add('hidden');
+    });
+</script>
+{% endblock %}

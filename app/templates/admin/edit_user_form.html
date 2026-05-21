@@ -1,0 +1,49 @@
+<div class="p-2">
+    <h2 class="text-2xl font-bold text-gray-800 mb-6">
+        {{ 'Редактирование пользователя' if user else 'Новый пользователь' }}
+    </h2>
+
+    <form hx-post="{{ '/api/admin/update-user-form/' + (user.id|string) if user else '/api/admin/create-user' }}" 
+          hx-target="{{ '#user-' + (user.id|string) if user else '#users-list' }}" 
+          hx-swap="{{ 'outerHTML' if user else 'afterbegin' }}" 
+          class="space-y-4">
+        
+        <div>
+            <label class="block text-xs text-gray-500 mb-1">Email (Логин)</label>
+            <input type="email" name="email" value="{{ user.email or '' }}" required 
+                   class="w-full border rounded p-2 text-sm">
+        </div>
+
+        <div>
+            <label class="block text-xs text-gray-500 mb-1">Пароль {{ '(оставьте пустым, если не хотите менять)' if user else '' }}</label>
+            <input type="password" name="password" {{ '' if user else 'required' }} 
+                   class="w-full border rounded p-2 text-sm">
+        </div>
+
+        <div>
+            <label class="block text-xs text-gray-500 mb-1">ФИО</label>
+            <input type="text" name="full_name" value="{{ user.name or '' }}" 
+                   class="w-full border rounded p-2 text-sm">
+        </div>
+
+        <div>
+            <label class="block text-xs text-gray-500 mb-1">Компания</label>
+            <select required name="company_id" class="w-full border rounded p-2 text-sm">
+                <option value="">Без компании</option>
+                {% for comp in companies %}
+                <option value="{{ comp.id }}" {{ 'selected' if user and user.company_id == comp.id else '' }}>
+                    {{ comp.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="flex gap-3 pt-4">
+            <button type="submit" class="flex-1 bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition">
+                {{ 'Сохранить' if user else 'Создать пользователя' }}
+            </button>
+            <button type="button" onclick="document.getElementById('admin-modal').classList.add('hidden')"
+                    class="px-6 py-3 bg-gray-100 text-gray-600 rounded-xl font-semibold">Отмена</button>
+        </div>
+    </form>
+</div>

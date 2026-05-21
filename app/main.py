@@ -12,7 +12,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
 from typing import List
 from datetime import datetime, date, timedelta
-import httpx
+import httpx, html
 from xhtml2pdf import pisa
 from io import BytesIO
 
@@ -94,13 +94,17 @@ async def login_browser(
     user = result.scalars().first()
 
     if not user or not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Error")
+        #raise HTTPException(status_code=401, detail="Error")
+        return HTMLResponse(
+            content="Неверный email или пароль", 
+            status_code=200 # Важно оставить 200, чтобы HTMX обработал ответ
+        )
     
     token = create_access_token(data={"sub": user.email, "role": user.role.value})
-    
-    response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
-    response.set_cookie(key="access_token", value=token,  path="/")
-    return response
+    res = Response()
+    res.headers["HX-Redirect"] = "/" # Это заставит браузер перейти на главную
+    res.set_cookie(key="access_token", value=token, httponly=True)
+    return res
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request, db: AsyncSession = Depends(get_db)): #current_user: User = Depends(get_current_user)):
@@ -110,17 +114,90 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)): #cur
             return RedirectResponse(url="/", status_code=303)
 
         result = await db.execute(select(Company))
+        
         companies = result.scalars().all()
+        res_users = await db.execute(
+            select(User).options(joinedload(User.company))
+        )
+        users = res_users.scalars().all()
 
         return templates.TemplateResponse(
             request=request,
-            name="admin.html",
-            context={"user": current_user, "companies": companies}
+            name="admin/users.html",
+            context={"user": current_user, "companies": companies, "users": users}
         )
     except HTTPException:
         return RedirectResponse(url="/login", status_code=303)
 
+
+
+# Получение формы
+@app.get("/api/admin/edit-user-form/{user_id}")
+async def get_user_form(request: Request, user_id: int = None, db: AsyncSession = Depends(get_db)):
+    user = None
+    if user_id:
+        res = await db.execute(select(User).where(User.id == user_id))
+        user = res.scalar_one_or_none()
     
+    comp_res = await db.execute(select(Company).where(Company.is_deleted == False))
+    companies = comp_res.scalars().all()
+    
+    return templates.TemplateResponse(request=request, name="admin/edit_user_form.html", context={
+        "user": user, "companies": companies
+    })
+
+@app.get("/api/admin/create-user-form")
+async def get_create_user_form(request: Request, db: AsyncSession = Depends(get_db)):
+    # Загружаем компании, чтобы привязать нового юзера к одной из них
+    comp_res = await db.execute(select(Company).where(Company.is_deleted == False))
+    companies = comp_res.scalars().all()
+    
+    return templates.TemplateResponse(request=request, name="admin/edit_user_form.html", context={
+        "user": None,  # Важно: передаем None
+        "companies": companies
+    })
+
+
+# Сохранение/Обновление
+@app.post("/api/admin/update-user-form/{user_id}")
+async def handle_user_save(request: Request, user_id: int = None, db: AsyncSession = Depends(get_db)):
+    form = await request.form()
+    
+    if user_id:
+        res = await db.execute(select(User).where(User.id == user_id))
+        user = res.scalar_one_or_none()
+    else:
+        user = User(role=UserRole.USER)
+        db.add(user)
+
+    user.email = form.get("email")
+    user.name = form.get("full_name")
+    user.company_id = int(form.get("company_id")) if form.get("company_id") else None
+    
+    if form.get("password"):
+        user.hashed_password = hash_password(form.get("password"))
+
+    await db.commit()
+    await db.refresh(user)
+    
+    # Чтобы в строке отобразилось имя компании, нужно её подгрузить
+    res = await db.execute(select(User).options(joinedload(User.company)).where(User.id == user.id))
+    user = res.scalar_one()
+
+    response = templates.TemplateResponse(request=request, name="admin/user_row.html", context={"user": user})
+    response.headers["HX-Trigger"] = "closeModal"
+    return response
+
+@app.delete("/api/admin/delete-user/{user_id}")
+async def delete_user(user_id: int, db: AsyncSession = Depends(get_db)):
+    res = await db.execute(select(User).where(User.id == user_id))
+    user = res.scalar_one_or_none()
+    if user:
+        #await db.delete(user)
+        user.is_active = False
+        await db.commit()
+    return HTMLResponse(content="")
+
 
 @app.post("/api/admin/create-user")
 async def admin_create_user(
@@ -151,8 +228,65 @@ async def admin_create_user(
     db.add(new_user)
     await db.commit()
     
-    return HTMLResponse(content=f"<p class='text-green-600 font-bold'>Пользователь {email} создан!</p>")
+    response = HTMLResponse(content="")
+    response.headers["HX-Trigger"] = "closeModal"
+    return response
 
+
+@app.get("/api/admin/edit-company/{company_id}")
+async def get_edit_company_form(request: Request, company_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Company).where(Company.id == company_id))
+    company = result.scalar_one_or_none()
+    
+    # Экранируем поля, где могут быть кавычки
+    safe_name = html.escape(company.name or "")
+    safe_fullname = html.escape(company.fullname or "")
+    
+    return templates.TemplateResponse(request=request, name="admin/edit_company_form.html", context={"company": company})
+
+@app.post("/api/admin/update-company/{company_id}")
+async def update_company(
+    company_id: int, 
+    request: Request, 
+    db: AsyncSession = Depends(get_db)
+):
+    form_data = await request.form()
+    result = await db.execute(select(Company).where(Company.id == company_id))
+    company = result.scalar_one_or_none()
+    
+    if not company:
+        return HTMLResponse("Компания не найдена", status_code=404)
+
+    # Обновляем все поля из формы
+    for field in ["name", "fullname", "inn", "kpp", "ogrn", "address1", "address2", 
+                  "tel1", "tel2", "email1", "email2", "bik", "ks", "rs"]:
+        setattr(company, field, form_data.get(field))
+
+    await db.commit()
+    
+    # Возвращаем обновленную строку таблицы (как в прошлом примере)
+    response = templates.TemplateResponse(request=request, name="admin/company_row.html", context={"company": company})
+    response.headers["HX-Trigger"] = "closeModal"
+    return response
+
+@app.delete("/api/admin/delete-company/{company_id}")
+async def delete_company(company_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Company).where(Company.id == company_id))
+    company = result.scalar_one_or_none()
+    
+    if company:
+        company.is_deleted = True # Просто ставим флаг
+        await db.commit()
+    
+    # Возвращаем пустую строку, чтобы HTMX удалил элемент из списка
+    return HTMLResponse(content="")
+
+@app.get("/api/admin/create-company-form")
+async def get_create_company_form(request: Request):
+    # Передаем None вместо объекта company, чтобы поля были пустыми
+    return templates.TemplateResponse(request=request, name="admin/edit_company_form.html", context={
+        "company": None  # В шаблоне используем {{ company.name or '' }}
+    })
 
 @app.post("/api/counterparties/get-or-create", response_model=CounterpartyRead)
 async def get_or_create_counterparty(
@@ -247,7 +381,6 @@ async def search_company_dadata(request: Request):
         )
     
     suggestions = resp.json().get("suggestions", []) if resp.status_code == 200 else []
-    
     return templates.TemplateResponse(request=request, name="company_search_results.html", context={"suggestions": suggestions})
 
 @app.post("/api/admin/create-company")
@@ -286,11 +419,10 @@ async def create_company(
     db.add(new_company)
     await db.commit()
     
-    return HTMLResponse(
-        '<div class="p-2 bg-green-100 text-green-700 rounded text-center font-bold">'
-        'Компания добавлена успешно!'
-        '</div>'
-    )
+    response = HTMLResponse(content="")
+    response.headers["HX-Trigger"] = "closeModal"
+    return response
+
 
 @app.get("/api/search/address")
 async def search_address(request: Request):

@@ -1,0 +1,26 @@
+{% if not company.is_deleted %}
+<tr class="border-b transition-colors hover:bg-gray-50" id="company-{{ company.id }}">
+    <td class="py-3 px-2">
+        <div class="font-medium text-gray-800">{{ company.name }}</div>
+        <div class="text-[10px] text-gray-400 uppercase">{{ company.inn or '—' }}</div>
+    </td>
+    <td class="py-3 px-2 text-right space-x-3">
+        <!-- Кнопка Правки -->
+        <button hx-get="/api/admin/edit-company/{{ company.id }}" 
+                hx-target="#admin-modal-content"
+                onclick="document.getElementById('admin-modal').classList.remove('hidden')"
+                class="text-blue-600 hover:underline text-sm font-semibold">
+            Правка
+        </button>
+
+        <!-- Кнопка Удаления -->
+        <button hx-delete="/api/admin/delete-company/{{ company.id }}"
+                hx-confirm="Вы уверены, что хотите удалить компанию {{ company.name }}?"
+                hx-target="#company-{{ company.id }}"
+                hx-swap="outerHTML"
+                class="text-red-400 hover:text-red-600 text-sm">
+            Удалить
+        </button>
+    </td>
+</tr>
+{% endif %}

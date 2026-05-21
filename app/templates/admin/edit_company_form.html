@@ -1,0 +1,89 @@
+<div class="p-2">
+    <h2 class="text-2xl font-bold text-gray-800 mb-6">
+        {{ 'Редактирование' if company else 'Новая компания' }}
+    </h2>
+
+    <form hx-post="{{ '/api/admin/update-company/' + (company.id|string) if company else '/api/admin/create-company' }}" 
+          hx-target="{{ '#company-' + (company.id|string) if company else '#companies-list' }}" 
+          hx-swap="{{ 'outerHTML' if company else 'afterbegin' }}" 
+          class="space-y-6">
+        
+        <!-- Основное -->
+        <div class="space-y-3">
+            <p class="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Основная информация</p>
+            <div class="relative">
+                <label class="block text-xs text-gray-500 mb-1">Название (Поиск DaData)</label>
+                <input type="text" name="name" 
+                    value="{{ company.name or '' }}" required autocomplete="off"
+                    hx-get="/api/admin/search-company-dadata" 
+                    hx-trigger="keyup changed delay:500ms" 
+                    hx-target="next .results-container"
+                    hx-swap="innerHTML"
+                    class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                
+                <!-- Сюда эндпоинт вставит файл company_search_results.html -->
+                <div class="results-container"></div>
+            </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Полное наименование</label>
+                <textarea name="fullname" rows="2" class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">{{ company.fullname or '' }}</textarea>
+            </div>
+        </div>
+
+        <!-- Регистрационные данные -->
+        <div class="grid grid-cols-3 gap-4">
+            <div class="col-span-1">
+                <label class="block text-xs text-gray-500 mb-1">ИНН</label>
+                <input type="text" name="inn" value="{{ company.inn or '' }}" class="w-full border rounded p-2 text-sm">
+            </div>
+            <div class="col-span-1">
+                <label class="block text-xs text-gray-500 mb-1">КПП</label>
+                <input type="text" name="kpp" value="{{ company.kpp or '' }}" class="w-full border rounded p-2 text-sm">
+            </div>
+            <div class="col-span-1">
+                <label class="block text-xs text-gray-500 mb-1">ОГРН</label>
+                <input type="text" name="ogrn" value="{{ company.ogrn or '' }}" class="w-full border rounded p-2 text-sm">
+            </div>
+        </div>
+
+        <!-- Адреса -->
+        <div class="space-y-3">
+            <p class="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Адреса</p>
+            <input type="text" name="address1" value="{{ company.address1 or '' }}" placeholder="Юридический адрес" class="w-full border rounded p-2 text-sm">
+            <input type="text" name="address2" value="{{ company.address2 or '' }}" placeholder="Фактический адрес" class="w-full border rounded p-2 text-sm">
+        </div>
+
+        <!-- Связь -->
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <p class="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-2">Телефоны</p>
+                <input type="text" name="tel1" value="{{ company.tel1 or '' }}" placeholder="Основной" class="w-full border rounded p-2 text-sm mb-2">
+                <input type="text" name="tel2" value="{{ company.tel2 or '' }}" placeholder="Дополнительный" class="w-full border rounded p-2 text-sm">
+            </div>
+            <div>
+                <p class="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-2">Email</p>
+                <input type="email" name="email1" value="{{ company.email1 or '' }}" placeholder="Основной" class="w-full border rounded p-2 text-sm mb-2">
+                <input type="email" name="email2" value="{{ company.email2 or '' }}" placeholder="Для счетов" class="w-full border rounded p-2 text-sm">
+            </div>
+        </div>
+
+        <!-- Банк -->
+        <div class="bg-gray-50 p-4 rounded-lg space-y-3">
+            <p class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Банковские реквизиты</p>
+            <div class="grid grid-cols-2 gap-4">
+                <input type="text" name="bik" value="{{ company.bik or '' }}" placeholder="БИК" class="border rounded p-2 text-sm">
+                <input type="text" name="ks" value="{{ company.ks or '' }}" placeholder="Корр. счет" class="border rounded p-2 text-sm">
+            </div>
+            <input type="text" name="rs" value="{{ company.rs or '' }}" placeholder="Расчетный счет" class="w-full border rounded p-2 text-sm">
+        </div>
+
+        <!-- Кнопки -->
+        <div class="flex gap-3 pt-4">
+            <button type="submit" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold">
+                {{ 'Сохранить изменения' if company else 'Создать компанию' }}
+            </button>
+            <button type="button" onclick="document.getElementById('admin-modal').classList.add('hidden')"
+                    class="px-6 py-3 bg-gray-100 text-gray-600 rounded-xl font-semibold">Отмена</button>
+        </div>
+    </form>
+</div>
