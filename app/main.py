@@ -15,6 +15,9 @@ from datetime import datetime, date, timedelta
 import httpx, html
 from xhtml2pdf import pisa
 from io import BytesIO
+from app.helpers import get_schedule
+from app.config import settings
+fit = settings.FIT
 
 from zoneinfo import ZoneInfo
 from fastapi.templating import Jinja2Templates
@@ -266,7 +269,7 @@ async def update_company(
     
     # Возвращаем обновленную строку таблицы (как в прошлом примере)
     response = templates.TemplateResponse(request=request, name="admin/company_row.html", context={"company": company})
-    response.headers["HX-Trigger"] = "closeModal"
+    response.headers["HX-Trigger"] = "closeModal, updateCompanies"
     return response
 
 @app.delete("/api/admin/delete-company/{company_id}")
@@ -287,6 +290,52 @@ async def get_create_company_form(request: Request):
     return templates.TemplateResponse(request=request, name="admin/edit_company_form.html", context={
         "company": None  # В шаблоне используем {{ company.name or '' }}
     })
+
+@app.get("/api/v1/schedule/view", response_class=HTMLResponse)
+async def schedule_view(pol_id: int = None, pod_id: int = None, order_id: int = None, db: AsyncSession = Depends(get_db)):
+    # Если выбраны не оба порта, ничего не показываем
+    if not pol_id or not pod_id or not order_id:
+        return ""
+    # 1. Находим названия портов по ID в вашей базе (для функции get_schedule)
+    # pol_name = db.get_port(pol_id).name ...
+    result = await db.execute(select(Port).where(Port.id == pol_id))
+    port_from = result.scalar_one_or_none()
+    result = await db.execute(select(Port).where(Port.id == pod_id))
+    port_to = result.scalar_one_or_none()
+    result_order = await db.execute(select(CargoOrder).where(CargoOrder.id == order_id))
+    order = result_order.scalar_one_or_none()
+    # 2. Вызываем FESCO API
+    if not order or not order.loading_date:
+        # Если даты в базе нет, используем текущую как запасной вариант
+        search_date = datetime.now().strftime("%Y-%m-%d")
+    else:
+        # Приводим дату из БД (datetime/date) к строке нужного формата
+        search_date = order.loading_date.strftime("%Y-%m-%d")
+    pol_name = port_from.name
+    pod_name = port_to.name
+    data = get_schedule(token=fit, date_from=search_date, from_loc=pol_name, to_loc=pod_name)
+
+    if not data or not data.get('data'):
+        return "<div class='p-3 text-sm text-amber-600 bg-amber-50 rounded'>Рейсы не найдены</div>"
+
+    # 3. Формируем HTML (можно через Jinja2 шаблон или f-строку)
+    html = '<div class="space-y-2">'
+    for ship in data['data'][0]['schedule']:
+        html += f"""
+        <div class="p-3 border rounded bg-white shadow-sm flex justify-between items-center text-sm">
+            <div>
+                <span class="font-bold">{ship['dateFrom']}</span> 
+                <span class="text-gray-400">→</span> 
+                <span class="font-bold">{ship['dateTo']}</span>
+                <div class="text-blue-600 font-medium">{ship['transportName']}</div>
+            </div>
+            <div class="text-right">
+                <div class="text-xs text-gray-500">Рейс: {ship['voyageNumber']}</div>
+            </div>
+        </div>
+        """
+    html += '</div>'
+    return html
 
 @app.post("/api/counterparties/get-or-create", response_model=CounterpartyRead)
 async def get_or_create_counterparty(

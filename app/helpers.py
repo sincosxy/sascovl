@@ -1,3 +1,6 @@
+import requests, json
+
+
 def validate_container_number(number: str) -> bool:
     # Убираем пробелы и тире, приводим к верхнему регистру
     number = number.strip().upper().replace("-", "").replace(" ", "")
@@ -45,3 +48,47 @@ def validate_container_number(number: str) -> bool:
 
     except Exception:
         return False
+    
+def fit_request(method, url, token, payload=None):
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json"
+    }
+    try:
+        if method == 'GET':
+            response = requests.get(url, headers=headers, params=payload, timeout=10)
+        else:
+            response = requests.post(url, headers=headers, json=payload, timeout=10)
+        
+        # Проверяем на HTTP ошибки (4xx, 5xx)
+        response.raise_for_status()
+        return response.json()
+    
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Ошибка запроса [{method}] {url}: {e}")
+        if response := getattr(e, 'response', None):
+            print(f"   Ответ сервера: {response.text}")
+        return None
+
+def get_schedule(token, date_from, from_loc, to_loc):
+    # 1. Получаем ID для локации ОТКУДА
+    res_from = fit_request('GET', 'https://api.fesco.com/api/v1/lk/handbooks/locations', token, {"text": from_loc})
+    from_id = next((loc['id'] for loc in res_from.get('data', []) if loc['loc_name'] == from_loc), None) if res_from else None
+
+    # 2. Получаем ID для локации КУДА
+    res_to = fit_request('GET', 'https://api.fesco.com/api/v1/lk/handbooks/locations', token, {"text": to_loc})
+    to_id = next((loc['id'] for loc in res_to.get('data', []) if loc['loc_name'] == to_loc), None) if res_to else None
+
+    # Проверка: нашли ли мы оба ID
+    if not from_id or not to_id:
+        print(f"⚠️ Не удалось найти ID локаций: {from_loc} -> {from_id}, {to_loc} -> {to_id}")
+        return None
+
+    # 3. Запрос расписания
+    payload = {
+        "beginDate": date_from,
+        "routes": [{"beginId": from_id, "finishId": to_id}]
+    }
+    
+    print(f"🔍 Ищем расписание: {from_loc} ({from_id}) -> {to_loc} ({to_id}) на {date_from}...")
+    return fit_request('POST', 'https://api.fesco.com/api/v1/lk/schedule/sea', token, payload)

@@ -62,7 +62,10 @@
                                 <th class="pb-3 text-right text-red-500">Удалить</th>
                             </tr>
                         </thead>
-                        <tbody id="users-list">
+                        <tbody id="users-list"
+                            hx-get="/api/admin/get-companies-list" 
+                            hx-trigger="updateCompanies from:body">
+
                             {% for user in users %}
                                 {% include "admin/user_row.html" %}
                             {% endfor %}

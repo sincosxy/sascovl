@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     DADA: str
+    FIT: str
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
