@@ -113,7 +113,7 @@ async def login_browser(
 async def admin_page(request: Request, db: AsyncSession = Depends(get_db)): #current_user: User = Depends(get_current_user)):
     try:
         current_user = await get_current_user(request, db)
-        if current_user.role != UserRole.ADMIN:
+        if (current_user.role == UserRole.USER):
             return RedirectResponse(url="/", status_code=303)
 
         result = await db.execute(select(Company))
