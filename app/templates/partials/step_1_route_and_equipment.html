@@ -1,0 +1,129 @@
+<!--div class="animate-in slide-in-from-right duration-300" id="wizard-step-container"-->
+<div id="step-container" class="max-w-4xl mx-auto p-6 bg-white shadow-lg rounded-lg animate-in slide-in-from-right duration-300">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold text-gray-800">Шаг 1: Маршрут и оборудование</h2>
+        <span class="text-xs font-mono bg-gray-100 px-2 py-1 rounded">Заказ №{{ order_id }}</span>
+    </div>
+    <input type="hidden" name="order_id" value="{{ order_id }}">
+    
+    {% include 'partials/wizard_nav.html' %}
+
+    <form hx-patch="/api/orders/{{ order_id }}/step-1" hx-target="#main-content" class="space-y-6">
+        
+        <!-- Поле даты погрузки -->
+        <div class="bg-gray-50 p-4 rounded-xl border border-gray-100">
+            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                📅 Предполагаемая дата погрузки
+            </label>
+            <input type="date" name="loading_date" 
+                   value="{{ order.loading_date.isoformat() if order.loading_date else default_date }}"
+                   min="{{ today }}" required
+                   class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2">
+        </div>
+
+        <!-- Секция ПОРТЫ И РАСПИСАНИЕ (Твоя интерактивная логика!) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-blue-50/50 rounded-xl border border-blue-100/50">
+            <div>
+                <label class="block text-xs font-semibold text-blue-700 uppercase">Порт погрузки (POL)</label>
+                <select name="pol_id" required
+                    hx-get="/api/v1/schedule/view" 
+                    hx-trigger="change" 
+                    hx-target="#schedule-results" 
+                    hx-include="[name='pol_id'], [name='pod_id'], [name='order_id']"
+                    class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2 bg-white">
+                    <option value="" disabled {% if not order.pol_id %}selected{% endif %}>Выберите порт...</option>
+                    {% for port in ports %}
+                    <option value="{{ port.id }}" {% if order and order.pol_id == port.id %}selected{% endif %}>{{ port.name }} ({{ port.code }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-blue-700 uppercase">Порт выгрузки (POD)</label>
+                <select name="pod_id" required
+                    hx-get="/api/v1/schedule/view" 
+                    hx-trigger="change" 
+                    hx-target="#schedule-results" 
+                    hx-include="[name='pol_id'], [name='pod_id'], [name='order_id']"
+                    class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2 bg-white">
+                    <option value="" disabled {% if not order.pod_id %}selected{% endif %}>Выберите порт...</option>
+                    {% for port in ports %}
+                    <option value="{{ port.id }}" {% if order and order.pod_id == port.id %}selected{% endif %}>{{ port.name }} ({{ port.code }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <!-- Контейнер для динамического вывода расписания -->
+            <div id="schedule-results" class="col-span-1 md:col-span-2 empty:hidden mt-2">
+                <!-- Сюда бэкенд подставит карточки рейсов судов через hx-get -->
+            </div>
+        </div>
+
+        <!-- Выбор основного типа оборудования -->
+        <div class="bg-gray-50 p-4 rounded-xl border border-gray-100">
+            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                🚢 Основной тип оборудования
+            </label>
+            <select name="equipment_id" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2 bg-white">
+                <option value="" disabled {% if not order.equipment_id %}selected{% endif %}>-- Выберите тип контейнера --</option>
+                {% for eq in equipments %}
+                    <option value="{{ eq.id }}" {% if order.equipment_id == eq.id %}selected{% endif %}>{{ eq.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Выбор собственности контейнера с Alpine.js инжектором -->
+        <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2 px-1">
+                💼 Собственность оборудования
+            </label>
+            <div class="grid grid-cols-2 gap-4" x-data="{ isSoc: {{ 'true' if order.is_soc else 'false' }} }">
+                
+                <!-- Вариант: Линейный (COC) -->
+                <label @click="isSoc = false" class="relative border-2 border-gray-200 rounded-xl p-4 cursor-pointer hover:border-blue-500 transition has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50">
+                   <input type="radio" name="is_soc" value="false" class="hidden" 
+                        {% if not order.is_soc %}checked{% endif %}>
+                    <div class="text-center">
+                        <span class="text-3xl">🏛️</span>
+                        <p class="font-semibold mt-2 text-sm md:text-base">Контейнер линии (COC)</p>
+                    </div>
+                </label>
+
+                <!-- Вариант: Собственный (SOC) -->
+                <label @click="isSoc = true" class="relative border-2 border-gray-200 rounded-xl p-4 cursor-pointer hover:border-blue-500 transition has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50">
+                    <input type="radio" name="is_soc" value="true" class="hidden"
+                        {% if order.is_soc %}checked{% endif %}>
+                    <div class="text-center">
+                        <span class="text-3xl">👤</span>
+                        <p class="font-semibold mt-2 text-sm md:text-base">Собственный (SOC)</p>
+                    </div>
+                </label>
+
+                <!-- Инструкции возврата для SOC -->
+                <div x-show="isSoc" x-collapse x-transition class="col-span-2 space-y-4 bg-blue-50/30 p-4 rounded-xl border border-blue-100 mt-2" style="display: {{ 'block' if order.is_soc else 'none' }};">
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" name="needs_return" value="true" {% if order.needs_return %}checked{% endif %} class="rounded text-blue-600 focus:ring-blue-500 border-gray-300">
+                        <span class="text-sm font-semibold text-gray-700">Требуется возврат порожнего контейнера</span>
+                    </label>
+                    
+                    <div class="space-y-2">
+                        <label class="block text-sm font-medium text-gray-600">Инструкции по возврату:</label>
+                        <textarea name="return_instructions" rows="2" placeholder="Укажите депо, адрес или особые условия возврата..." class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2 text-sm bg-white">{{ order.return_instructions or '' }}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition shadow-lg">
+            Далее: Детали груза →
+        </button>
+    </form>
+</div>
+
+<script>
+    // Закрытие выпадающих списков автокомплита при клике мимо (Твой рабочий скрипт)
+    document.addEventListener('click', function (e) {
+        if (!e.target.closest('.results') && !e.target.closest('input[hx-get]')) {
+            document.querySelectorAll('.results').forEach(el => el.innerHTML = '');
+        }
+    });
+</script>

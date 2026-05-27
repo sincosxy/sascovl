@@ -26,7 +26,7 @@ class Company(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     fullname = Column(String, index=True)
-    inn = Column(String, unique=True, index=True, nullable=True) # ИНН может не быть у иноземцев
+    inn = Column(String, unique=False, index=True, nullable=True) # ИНН может не быть у иноземцев
     kpp = Column(String, unique=False, nullable=True)
     ogrn = Column(String, unique=False, nullable=True)
     address1 = Column(String, unique=False, nullable=True)
@@ -185,4 +185,4 @@ class GeneralCargoItem(Base):
 
     order = relationship("CargoOrder", back_populates="items")
 
-User.orders = relationship("CargoOrder", back_populates="owner")
+#User.orders = relationship("CargoOrder", back_populates="owner")
