@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Request, Response, Form
+from fastapi import FastAPI, Depends, HTTPException, status, Request, Response, Form, BackgroundTasks
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm 
 from app.helpers import validate_container_number
 from app.db import engine, Base, get_db, dadatoken
@@ -19,8 +20,22 @@ from app.helpers import get_schedule
 from app.config import settings
 fit = settings.FIT
 
+import io
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
+
+
 from zoneinfo import ZoneInfo
 from fastapi.templating import Jinja2Templates
+
+SMTP_SERVER = "smtp.mail.ru"
+SMTP_PORT = 25
+SMTP_USER = "example@mail.ru"
+SMTP_PASSWORD = "password"
+
 
 templates = Jinja2Templates(directory="app/templates")
 
@@ -1183,13 +1198,34 @@ async def get_order_summary(
 async def confirm_order(
     order_id: int,
     request: Request,
+    background_tasks: BackgroundTasks,      # Магия фонового выполнения FastAPI
+    #email_to: str = Form(...),              # Прилетает из формы Шага 4
+    #email_text: str = Form(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     # Находим заказ
+    #result = await db.execute(
+    #    select(CargoOrder).where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
+    #)
+
     result = await db.execute(
-        select(CargoOrder).where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
+        select(CargoOrder)
+        .options(
+            selectinload(CargoOrder.owner).joinedload(User.company),
+            selectinload(CargoOrder.shipper),
+            selectinload(CargoOrder.consignee),
+            selectinload(CargoOrder.port_of_loading),
+            selectinload(CargoOrder.port_of_discharge),
+            selectinload(CargoOrder.equipment),
+            selectinload(CargoOrder.containers).options(
+                selectinload(Container.equipment),
+                selectinload(Container.items)
+            )
+        )
+        .where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
     )
+
     order = result.scalars().first()
 
     if not order:
@@ -1198,9 +1234,33 @@ async def confirm_order(
     # Меняем статус
     order.status = "CONFIRMED"
     
+    order.updated_at = datetime.now() 
+
     # Здесь можно добавить логику уведомления оператора (email или Telegram)
     
+    
+
+    # 2. Генерируем байты PDF, используя твою логику
+    #html_content = templates.get_template("pdf/booking_note.html").render({"order": order})
+    
+    #pdf_buffer = BytesIO()
+    #pisa_status = pisa.CreatePDF(BytesIO(html_content.encode("utf-8")), dest=pdf_buffer)
+
+    #if pisa_status.err:
+    #    raise HTTPException(status_code=500, detail="Ошибка конвертации HTML в PDF")
+        
+    #pdf_bytes = pdf_buffer.getvalue()
+
     await db.commit()
+
+     # 3. Отправляем тяжелую задачу с SMTP в фон, чтобы бэкенд мгновенно освободился
+    #background_tasks.add_task(
+    #    send_email_worker,
+    #    to_email='auto@n-l-n.ru',
+    #    order_id=order_id,
+    #   pdf_bytes=pdf_bytes,
+    #   text_body='сгенерированная заявка'
+    #
 
     # После подтверждения возвращаем пользователя в список заказов (Dashboard)
     # Используем HTMX-заголовок для перенаправления или просто отдаем список
@@ -1432,3 +1492,50 @@ async def generate_pdf(
             "Content-Disposition": f"attachment; filename=Booking_Note_{order_id}.pdf"
         }
     )
+
+def build_pdf_bytes(order, template_env) -> bytes:
+    """Принимает объект заказа и Jinja-окружение, возвращает чистые байты PDF"""
+    # Твой оригинальный рендеринг и кодирование в utf-8
+    html_content = template_env.get_template("pdf/booking_note.html").render({"order": order})
+    
+    pdf_buffer = BytesIO()
+    pisa_status = pisa.CreatePDF(BytesIO(html_content.encode("utf-8")), dest=pdf_buffer)
+
+    if pisa_status.err:
+        raise HTTPException(status_code=500, detail="Ошибка конвертации HTML в PDF")
+        
+    return pdf_buffer.getvalue()
+
+def send_email_worker(to_email: str, order_id: int, pdf_bytes: bytes, text_body: str):
+    """Этот воркер теперь полностью изолирован от БД и не вызовет MissingGreenlet"""
+    msg = MIMEMultipart()
+    msg["From"] = SMTP_USER
+    msg["To"] = to_email
+    msg["Subject"] = f"Заявка на контейнерную перевозку №{order_id}"
+
+    msg.attach(MIMEText(text_body, "plain", "utf-8"))
+
+    part = MIMEBase("application", "octet-stream")
+    part.set_payload(pdf_bytes) # Просто вставляем готовые байты из памяти
+    encoders.encode_base64(part)
+    part.add_header(
+        "Content-Disposition",
+        f"attachment; filename=Booking_Note_{order_id}.pdf",
+    )
+    msg.attach(part)
+
+
+    try:
+        # 1. Подключаемся к 25 порту в режиме чистого текста
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=15.0) as server:
+            server.ehlo()  # Приветствуем сервер
+            
+            # 2. Передаем логин и пароль (авторизация без TLS)
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            
+            # 3. Отправляем письмо
+            server.sendmail(SMTP_USER, to_email, msg.as_string())
+            print(f" Mail successfully sent with AUTH to {to_email}")
+            
+    except Exception as e:
+        print(f"❌ Corporate SMTP Auth Error: {e}")
