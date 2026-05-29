@@ -1541,6 +1541,7 @@ async def generate_pdf(
             selectinload(CargoOrder.owner).joinedload(User.company), # Данные вашей компании
             selectinload(CargoOrder.shipper),
             selectinload(CargoOrder.consignee),
+            selectinload(CargoOrder.pre_carriage_carrier),
             selectinload(CargoOrder.port_of_loading),
             selectinload(CargoOrder.port_of_discharge),
             selectinload(CargoOrder.equipment),

@@ -226,7 +226,7 @@
                     <b>Контакт:</b> {{ order.pre_carriage_contact or '-' }}
                 {% else %}
                     <i>Организуется силами отправителя</i><br>
-                    Перевозчик: {{ order.pre_carriage_carrier or '-' }}
+                    Перевозчик: {{ order.pre_carriage_carrier.name or '-' }}
                 {% endif %}
             </div>
         </div>
