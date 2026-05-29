@@ -1,6 +1,7 @@
 <div id="step-container" class="max-w-4xl mx-auto p-8 bg-white shadow-2xl rounded-xl border border-gray-100">
     <div class="flex justify-between items-start border-b pb-6 mb-6">
         {% if order.status == 'draft' %}
+        
         <div>
             <h2 class="text-3xl font-extrabold text-gray-900">Проверка заказа #{{ order.id }}</h2>
             <p class="text-gray-500 mt-1">Пожалуйста, проверьте данные перед финальной отправкой</p>
@@ -9,6 +10,8 @@
         <div class="bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-bold">
             Черновик
         </div>
+        
+    
         {% else %}
         <div>
             <h2 class="text-3xl font-extrabold text-gray-900">Заказ #{{ order.id }}</h2>
@@ -19,8 +22,11 @@
         </div>
         {% endif %}
     </div>
-
+    {% if order.status == 'draft' %}
+    {% include 'partials/wizard_nav.html' %}
+    {% endif %}
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        
         <!-- Левая колонка: Маршрут и Контрагенты -->
         <div class="space-y-6">
             <section>
@@ -160,7 +166,7 @@
     <!-- Кнопки действий -->
     <div class="flex justify-between items-center mt-10 pt-6 border-t">
         {% if order.status == 'draft' %}
-            <button hx-get="/api/orders/{{ order_id }}/step-4" hx-target="#main-content"
+            <button hx-get="/api/orders/{{ order_id }}/step-3" hx-target="#main-content"
                     class="text-gray-500 hover:text-gray-800 font-medium transition">
                 ← Вернуться к правкам
             </button>
@@ -191,11 +197,11 @@
                     class="text-blue-600 hover:underline font-medium">
                 ← В список заказов
             </button>
-            <!--a href="/api/orders/{{ order_id }}/pdf" target="_blank" 
+            <a href="/api/orders/{{ order_id }}/pdf" target="_blank" 
                 class="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 rounded border border-red-200 hover:bg-red-100">
-                    <svg class="w-4 h-2" fill="currentColor" viewBox="0 0 20 20">...</svg>
-                    Booking Note (PDF)
-                </a-->
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">...</svg>
+                    Скачать Booking Note (PDF)
+                </a>
             <div class="text-sm text-gray-500 italic">
                 Заказ заблокирован для редактирования, так как он уже передан оператору.
             </div>

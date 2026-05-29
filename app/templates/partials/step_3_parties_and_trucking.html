@@ -1,0 +1,196 @@
+<div id="step-container" class="max-w-4xl mx-auto p-6 bg-white shadow-lg rounded-lg animate-in slide-in-from-right duration-300">
+    <div class="flex items-center justify-between mb-4 border-b pb-2">
+        <h2 class="text-xl font-bold text-gray-800">Шаг 3: Участники и Наземная доставка</h2>
+        <span class="text-xs font-mono bg-gray-100 px-2 py-1 rounded">Заказ №{{ order_id }}</span>
+    </div>
+    
+    <input type="hidden" name="order_id" value="{{ order_id }}">
+    {% include 'partials/wizard_nav.html' %}
+    
+    <form hx-patch="/api/orders/{{ order_id }}/step-3" hx-target="#main-content" class="space-y-6 mt-6">
+        
+        <!-- ========================================== -->
+        <!-- БЛОК 1: ОТПРАВИТЕЛЬ + АВТОДОСТАВКА (Pre)   -->
+        <!-- ========================================== -->
+        <div x-data="{ pre_req: {{ 'true' if order.pre_carriage_required else 'false' }} }" 
+             class="p-5 border-2 rounded-xl transition-colors duration-300"
+             :class="pre_req ? 'border-blue-100 bg-blue-50/20' : 'border-gray-200 bg-white'">
+            
+            <div class="flex items-center gap-3 mb-4">
+                <div class="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                    <span class="text-xl">F</span>
+                </div>
+                <div>
+                    <h3 class="font-bold text-gray-800 uppercase text-xs tracking-wider">Пункт отправления / Отправитель (Shipper)</h3>
+                    <p class="text-[10px] text-gray-400">Кто отгружает и как доставляем в порт</p>
+                </div>
+            </div>
+
+            <!-- Поля Отправителя -->
+            <div class="cp-group relative">
+                <label class="block text-xs font-bold text-gray-500 uppercase">Отправитель</label>
+                <input type="text" name="shipper_name" autocomplete="off"
+                    hx-get="/api/search/counterparty" hx-trigger="keyup changed delay:500ms, focus" hx-target="next .results"
+                    value="{{ order.shipper.name if order.shipper else '' }}" class="w-full border rounded p-2">
+                <div class="results"></div>
+                
+                <div class="grid grid-cols-2 gap-2 mt-2">
+                    <!-- Добавили id для точечного OOB-свапа -->
+                    <input type="text" id="shipper_inn" name="shipper_inn" placeholder="ИНН" value="{{ order.shipper.inn or '' }}" class="text-xs border rounded p-1">
+                    <input type="text" id="shipper_contact" name="shipper_contact" placeholder="Контакты" value="{{ order.shipper.contact_info or '' }}" class="text-xs border rounded p-1">
+                    <input type="text" id="shipper_address" name="shipper_address" placeholder="Адрес" value="{{ order.shipper.address or '' }}" class="col-span-2 text-xs border rounded p-1">
+                </div>
+            </div>
+
+            <!-- Галка автодоставки на затарку -->
+            <div class="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
+                <label class="flex items-center space-x-3 cursor-pointer">
+                    <input type="checkbox" name="pre_carriage_required" x-model="pre_req" {% if order.pre_carriage_required %}checked{% endif %} class="rounded text-blue-600 focus:ring-blue-500 border-gray-300">
+                    <span class="text-sm font-semibold text-gray-700">Нужна автодоставка силами сервиса до порта</span>
+                </label>
+                <span class="text-xs font-medium" :class="pre_req ? 'text-blue-600' : 'text-gray-400'" x-text="pre_req ? 'Наш вывоз' : 'Свой вывоз'"></span>
+            </div>
+
+            <!-- ПОЛЯ АВТОДОСТАВКИ: Если ДА -->
+            <div x-show="pre_req" x-transition class="space-y-3 pt-4 mt-3 border-t border-blue-100">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div class="md:col-span-2 address-group relative">
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase">Адрес склада затарки</label>
+                        <input type="text" name="pre_carriage_address" value="{{ order.pre_carriage_address or '' }}" 
+                            autocomplete="off" hx-get="/api/search/address" hx-trigger="keyup changed delay:400ms" hx-target="next .address-results"
+                            class="mt-1 block w-full rounded border p-2 text-xs bg-white">
+                        <div class="address-results absolute left-0 right-0 z-40 bg-white shadow-md"></div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase">Контакт на складе</label>
+                        <input type="text" name="pre_carriage_contact" value="{{ order.pre_carriage_contact or '' }}" class="mt-1 block w-full rounded border p-2 text-xs bg-white">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase">Дата и время подачи автомобиля</label>
+                        <input type="datetime-local" name="pre_carriage_date" 
+                            value="{{ order.pre_carriage_date.strftime('%Y-%m-%dT%H:%M') if order.pre_carriage_date else (order.loading_date.strftime('%Y-%m-%d') + 'T09:00' if order.loading_date else '') }}" 
+                            class="mt-1 block w-full rounded border p-2 text-xs bg-white">
+                    </div>
+                </div>
+            </div>
+
+            <!-- ПОЛЯ АВТОДОСТАВКИ: Если НЕТ (Свой вывоз) -->
+            <div x-show="!pre_req" x-transition class="space-y-3 pt-4 mt-3 border-t border-gray-100">
+                <div>
+                    <label class="block text-[10px] font-bold text-orange-600 uppercase">Транспортная компания (Ваш автоперевозчик)</label>
+                    <input type="text" name="pre_carriage_carrier" value="{{ order.pre_carriage_carrier or '' }}" placeholder="Укажите название ТК для оформления релиза/разнарядки в порту" class="mt-1 block w-full rounded border p-2 text-xs bg-white">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase">Комментарий к забору груза</label>
+                    <textarea name="pre_carriage_comment" rows="1" class="mt-1 block w-full rounded border p-2 text-xs bg-white">{{ order.pre_carriage_comment or '' }}</textarea>
+                </div>
+            </div>
+        </div>
+        <!-- ========================================== -->
+        <!-- БЛОК 2: ПОЛУЧАТЕЛЬ + АВТОДОСТАВКА (On)     -->
+        <!-- ========================================== -->
+        <div x-data="{ on_req: {{ 'true' if order.on_carriage_required else 'false' }} }" 
+             class="p-5 border-2 rounded-xl transition-colors duration-300"
+             :class="on_req ? 'border-green-100 bg-green-50/20' : 'border-gray-200 bg-white'">
+            
+            <div class="flex items-center gap-3 mb-4">
+                <div class="p-2 bg-green-50 text-green-600 rounded-lg font-bold">POD</div>
+                <div>
+                    <h3 class="font-bold text-gray-800 uppercase text-xs tracking-wider">Пункт назначения / Получатель (Consignee)</h3>
+                    <p class="text-[10px] text-gray-400">Кто забирает и как вывозим из порта до двери</p>
+                </div>
+            </div>
+
+            <!-- Данные Получателя -->
+            <div class="cp-group relative space-y-3">
+                <input type="text" id="consignee_name" name="consignee_name" autocomplete="off" placeholder="Название компании (Поиск по Дадате)..."
+                    hx-get="/api/search/counterparty" hx-trigger="keyup changed delay:500ms, focus" hx-target="next .results"
+                    value="{{ order.consignee.name if order.consignee else '' }}" class="w-full border rounded p-2 text-sm bg-white">
+                <div class="results"></div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <input type="text" id="consignee_inn" name="consignee_inn" placeholder="ИНН" value="{{ order.consignee.inn or '' }}" class="text-xs border rounded p-2 bg-white">
+                    <input type="text" id="consignee_contact" name="consignee_contact" placeholder="Контакты" value="{{ order.consignee.contact_info or '' }}" class="text-xs border rounded p-2 bg-white">
+                    <input type="text" id="consignee_address" name="consignee_address" placeholder="Юридический адрес" value="{{ order.consignee.address or '' }}" class="text-xs border rounded p-2 bg-white">
+                </div>
+            </div>
+
+            <!-- Галка автодоставки из порта -->
+            <div class="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
+                <label class="flex items-center space-x-3 cursor-pointer">
+                    <input type="checkbox" name="on_carriage_required" x-model="on_req" {% if order.on_carriage_required %}checked{% endif %} class="rounded text-green-600 focus:ring-green-500 border-gray-300">
+                    <span class="text-sm font-semibold text-gray-700">Нужна автодоставка силами сервиса из порта до двери</span>
+                </label>
+                <span class="text-xs font-medium" :class="on_req ? 'text-green-600' : 'text-gray-400'" x-text="on_req ? 'Наш вывоз' : 'Свой вывоз'"></span>
+            </div>
+                        <!-- ПОЛЯ АВТОДОСТАВКИ: Если ДА -->
+            <div x-show="on_req" x-transition class="space-y-3 pt-4 mt-3 border-t border-green-100">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div class="md:col-span-2 address-group relative">
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase">Адрес выгрузки (До двери)</label>
+                        <input type="text" name="on_carriage_address" value="{{ order.on_carriage_address or '' }}" 
+                            autocomplete="off" hx-get="/api/search/address" hx-trigger="keyup changed delay:400ms" hx-target="next .address-results"
+                            class="mt-1 block w-full rounded border p-2 text-xs bg-white">
+                        <div class="address-results absolute left-0 right-0 z-40 bg-white shadow-md"></div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase">Контакт на выгрузке</label>
+                        <input type="text" name="on_carriage_contact" value="{{ order.on_carriage_contact or '' }}" class="mt-1 block w-full rounded border p-2 text-xs bg-white">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase">Желаемая дата доставки груза</label>
+                        <input type="datetime-local" name="on_carriage_date" value="{{ order.on_carriage_date.strftime('%Y-%m-%dT%H:%M') if order.on_carriage_date else '' }}" class="mt-1 block w-full rounded border p-2 text-xs bg-white">
+                    </div>
+                </div>
+            </div>
+
+            <!-- ПОЛЯ АВТОДОСТАВКИ: Если НЕТ (Свой вывоз) -->
+            <div x-show="!on_req" x-transition class="space-y-3 pt-4 mt-3 border-t border-gray-100">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase">Транспортная компания / Автоперевозчик на вывоз</label>
+                    <input type="text" name="on_carriage_notes" value="{{ order.on_carriage_notes or '' }}" placeholder="Укажите ТК, которая будет забирать контейнер по доверенности" class="mt-1 block w-full rounded border p-2 text-xs bg-white">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase">Комментарий по релизу в порту</label>
+                    <textarea name="on_carriage_comment" rows="1" class="mt-1 block w-full rounded border p-2 text-xs bg-white">{{ order.on_carriage_comment or '' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- БЛОК 3: УВЕДОМИТЬ (NOTIFY PARTY)           -->
+        <!-- ========================================== -->
+        <div class="bg-gray-50/50 p-4 rounded-xl border border-gray-100 space-y-2">
+            <label class="block text-xs font-bold text-gray-500 uppercase">🔔 Уведомить (Notify Party)</label>
+            <input type="text" value="{{ order.notify_party.name if order.notify_party else '' }}"
+                    name="notify_name" 
+                    placeholder="Оставьте пустым, если совпадает с получателем" 
+                    list="notify-list"
+                    hx-get="/api/counterparties/search" hx-trigger="keyup changed delay:300ms, focus" hx-target="#notify-list" autocomplete="off"
+                    class="block w-full border border-gray-300 rounded p-2 text-xs focus:ring-blue-500 bg-white">
+            <datalist id="notify-list"></datalist>
+        </div>
+
+        <!-- КНОПКИ НАВИГАЦИИ -->
+        <div class="flex items-center justify-between pt-4 border-t">
+            <button type="button" 
+                    hx-get="/api/orders/{{ order_id }}/step-2" hx-target="#main-content" 
+                    class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-6 rounded-lg text-sm transition">
+                ← Назад к грузу
+            </button>
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-8 rounded-lg text-sm transition shadow-md">
+                Далее: Проверка заказа →
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+    document.addEventListener('click', function (e) {
+        if (!e.target.closest('.results') && !e.target.closest('.address-results') && !e.target.closest('input[hx-get]')) {
+            document.querySelectorAll('.results, .address-results').forEach(el => el.innerHTML = '');
+        }
+    });
+</script>
+    </form>
+</div>
