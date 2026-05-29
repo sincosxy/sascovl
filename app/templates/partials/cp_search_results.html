@@ -19,6 +19,8 @@
     <div class="p-2 hover:bg-blue-50 cursor-pointer border-b last:border-0"
          hx-on:click="
             let row = this.closest('.cp-group');
+            console.log('=== ОТЛАДКА КЛИКА (БАЗА) ===');
+            console.log('1. Контейнер .cp-group:', row);
             row.querySelector('[name$=_name]').value = '{{ cp.name }}';
             row.querySelector('[name$=_inn]').value = '{{ cp.inn or '' }}';
             row.querySelector('[name$=_address]').value = '{{ cp.address or '' }}';

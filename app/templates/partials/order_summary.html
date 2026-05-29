@@ -71,7 +71,7 @@
                             <b> {{ order.pre_carriage_date.strftime('%d.%m.%Y %H:%M')}}</b>
                         {% else %}
                             <p>🏢 Свой вывоз (Перевозчик клиента)</p>
-                            <p class="font-medium text-orange-600">{{ order.pre_carriage_carrier or 'Не указан' }}</p>
+                            <p class="font-medium text-orange-600">{{ order.pre_carriage_carrier.name or 'Не указан' }}</p>
                         {% endif %}
                     </div>
                     <div>

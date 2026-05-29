@@ -64,7 +64,7 @@ class Counterparty(Base):
     contact_info = Column(String, nullable=True)
     last_use = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     use_count = Column(Integer, default=1)
-
+    is_carrier = Column(Boolean, default=False, nullable=False)
     user = relationship("User")
 
 class CargoOrder(Base):
@@ -108,7 +108,8 @@ class CargoOrder(Base):
     pre_carriage_contact = Column(String, nullable=True)
     pre_carriage_date = Column(DateTime, nullable=True)
     pre_carriage_comment = Column(String, nullable=True)
-    pre_carriage_carrier = Column(String, nullable=True)
+    pre_carriage_carrier_id = Column(Integer, ForeignKey("counterparties.id"), nullable=True)
+    pre_carriage_carrier = relationship("Counterparty", foreign_keys=[pre_carriage_carrier_id])
 
     # On-carriage (Импорт / Пункт назначения)
     on_carriage_required = Column(Boolean, default=False)
@@ -116,6 +117,7 @@ class CargoOrder(Base):
     on_carriage_contact = Column(String, nullable=True)
     on_carriage_notes = Column(String, nullable=True)
     on_carriage_comment = Column(String, nullable=True)
+    on_carriage_carrier = Column(String, nullable=True)
 
 
 

@@ -16,10 +16,10 @@
              class="p-5 border-2 rounded-xl transition-colors duration-300"
              :class="pre_req ? 'border-blue-100 bg-blue-50/20' : 'border-gray-200 bg-white'">
             
+
+
             <div class="flex items-center gap-3 mb-4">
-                <div class="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                    <span class="text-xl">F</span>
-                </div>
+                <div class="p-2 bg-blue-50 text-blue-600 rounded-lg font-bold">POL</div>
                 <div>
                     <h3 class="font-bold text-gray-800 uppercase text-xs tracking-wider">Пункт отправления / Отправитель (Shipper)</h3>
                     <p class="text-[10px] text-gray-400">Кто отгружает и как доставляем в порт</p>
@@ -48,7 +48,7 @@
                     <input type="checkbox" name="pre_carriage_required" x-model="pre_req" {% if order.pre_carriage_required %}checked{% endif %} class="rounded text-blue-600 focus:ring-blue-500 border-gray-300">
                     <span class="text-sm font-semibold text-gray-700">Нужна автодоставка силами сервиса до порта</span>
                 </label>
-                <span class="text-xs font-medium" :class="pre_req ? 'text-blue-600' : 'text-gray-400'" x-text="pre_req ? 'Наш вывоз' : 'Свой вывоз'"></span>
+                <span class="text-xs font-medium" :class="pre_req ? 'text-blue-600' : 'text-gray-400'" x-text="pre_req ? 'Наш автотранспорт' : 'Ваш автотранспорт'"></span>
             </div>
 
             <!-- ПОЛЯ АВТОДОСТАВКИ: Если ДА -->
@@ -57,7 +57,7 @@
                     <div class="md:col-span-2 address-group relative">
                         <label class="block text-[10px] font-bold text-gray-400 uppercase">Адрес склада затарки</label>
                         <input type="text" name="pre_carriage_address" value="{{ order.pre_carriage_address or '' }}" 
-                            autocomplete="off" hx-get="/api/search/address" hx-trigger="keyup changed delay:400ms" hx-target="next .address-results"
+                            autocomplete="off" hx-get="/api/search/address" hx-trigger="keyup changed delay:400ms" hx-target="next .address-results" hx-vals='{"is_carrier": "false"}'
                             class="mt-1 block w-full rounded border p-2 text-xs bg-white">
                         <div class="address-results absolute left-0 right-0 z-40 bg-white shadow-md"></div>
                     </div>
@@ -76,10 +76,21 @@
 
             <!-- ПОЛЯ АВТОДОСТАВКИ: Если НЕТ (Свой вывоз) -->
             <div x-show="!pre_req" x-transition class="space-y-3 pt-4 mt-3 border-t border-gray-100">
-                <div>
+                <div class="cp-group relative mt-1">
                     <label class="block text-[10px] font-bold text-orange-600 uppercase">Транспортная компания (Ваш автоперевозчик)</label>
-                    <input type="text" name="pre_carriage_carrier" value="{{ order.pre_carriage_carrier or '' }}" placeholder="Укажите название ТК для оформления релиза/разнарядки в порту" class="mt-1 block w-full rounded border p-2 text-xs bg-white">
+                    <!--input type="text" name="pre_carriage_carrier" value="{{ order.pre_carriage_carrier or '' }}" placeholder="Укажите название ТК для оформления релиза/разнарядки в порту" class="mt-1 block w-full rounded border p-2 text-xs bg-white"-->
+                    <input type="text" name="carrier_name" autocomplete="off" placeholder="Укажите название ТК для оформления релиза/разнарядки в порту"
+                        hx-get="/api/search/counterparty" hx-trigger="keyup changed delay:500ms, focus" hx-target="next .results" hx-vals='{"is_carrier": "true"}'
+                        value="{{ order.pre_carriage_carrier.name if order.pre_carriage_carrier else '' }}" class="w-full border rounded p-2">
+                    <div class="results"></div>
+                    <div class="grid grid-cols-2 gap-2 mt-2">
+                    <!-- Добавили id для точечного OOB-свапа -->
+                        <input type="text" id="carrier_inn" name="carrier_inn" placeholder="ИНН" value="{{ order.pre_carriage_carrier.inn or '' }}" class=" hidden text-xs border rounded p-1">
+                        <input type="text" id="carrier_contact" name="carrier_contact" placeholder="Контакты" value="{{ order.pre_carriage_carrier.contact_info or '' }}" class=" hidden text-xs border rounded p-1">
+                        <input type="text" id="carrier_address" name="carrier_address" placeholder="Адрес" value="{{ order.pre_carriage_carrier.address or '' }}" class=" hidden col-span-2 text-xs border rounded p-1">
+                    </div>
                 </div>
+                
                 <div>
                     <label class="block text-[10px] font-bold text-gray-400 uppercase">Комментарий к забору груза</label>
                     <textarea name="pre_carriage_comment" rows="1" class="mt-1 block w-full rounded border p-2 text-xs bg-white">{{ order.pre_carriage_comment or '' }}</textarea>
@@ -103,8 +114,8 @@
 
             <!-- Данные Получателя -->
             <div class="cp-group relative space-y-3">
-                <input type="text" id="consignee_name" name="consignee_name" autocomplete="off" placeholder="Название компании (Поиск по Дадате)..."
-                    hx-get="/api/search/counterparty" hx-trigger="keyup changed delay:500ms, focus" hx-target="next .results"
+                <input type="text" id="consignee_name" name="consignee_name" autocomplete="off" placeholder="Название компании"
+                    hx-get="/api/search/counterparty" hx-trigger="keyup changed delay:500ms, focus" hx-target="next .results" hx-vals='{"is_carrier": "false"}'
                     value="{{ order.consignee.name if order.consignee else '' }}" class="w-full border rounded p-2 text-sm bg-white">
                 <div class="results"></div>
                 

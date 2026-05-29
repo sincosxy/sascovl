@@ -11,7 +11,7 @@ from app.auth import verify_password, create_access_token, get_current_user, has
 from app.schemas import Token, UserLogin, CounterpartyCreate, CounterpartyRead, OrderRead, UserCreate
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
-from typing import List
+from typing import List, Optional
 from datetime import datetime, date, timedelta
 import httpx, html
 from xhtml2pdf import pisa
@@ -393,7 +393,7 @@ async def get_or_create_counterparty(
     return new_party
 
 
-async def sync_counterparty(db, user_id, name, inn, address, contact):
+async def sync_counterparty(db, user_id, name, inn, address, contact, is_carrier=False):
     if not name or not name.strip(): return None
     
     name = name.strip()
@@ -407,10 +407,11 @@ async def sync_counterparty(db, user_id, name, inn, address, contact):
         cp.inn = inn
         cp.address = address
         cp.contact_info = contact
+        cp.is_carrier = is_carrier
         cp.use_count += 1
     else:
         # Создаем нового
-        cp = Counterparty(user_id=user_id, name=name, inn=inn, address=address, contact_info=contact)
+        cp = Counterparty(user_id=user_id, name=name, inn=inn, address=address, contact_info=contact, is_carrier=is_carrier)
         db.add(cp)
     
     await db.flush()
@@ -527,11 +528,14 @@ async def search_address(request: Request):
     return HTMLResponse(html)
 
 @app.get("/api/search/counterparty")
-async def search_cp(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def search_cp(request: Request, is_carrier: Optional[bool] = False, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     search_query = next(iter(request.query_params.values()), "").strip()
     
     # 1. Ищем своих в БД
     query = select(Counterparty).where(Counterparty.user_id == current_user.id)
+    if is_carrier:
+        query = query.where(Counterparty.is_carrier == True)
+
     if search_query:
         query = query.where(Counterparty.name.ilike(f"%{search_query}%"))
         query = query.order_by(Counterparty.use_count.desc())
@@ -569,11 +573,15 @@ async def search_cp(request: Request, db: AsyncSession = Depends(get_db), curren
         except Exception as e:
             print(f"DaData error: {e}")
 
-    return templates.TemplateResponse(request=request, name = "partials/cp_search_results.html", context={"cps": local_cps, "external_cps": external_cps})
+    return templates.TemplateResponse(
+        request=request,
+        name = "partials/cp_search_results.html",
+        context={"cps": local_cps, "external_cps": external_cps, "is_carrier": is_carrier}
+    )
 
 
 # Вспомогательная функция для "умного" поиска/создания
-async def get_or_create_counterparty(name: str, user_id: int, db: AsyncSession):
+async def get_or_create_counterparty(name: str, user_id: int, db: AsyncSession, is_carrier: bool = False,  inn: Optional[str] = None, address: Optional[str] = None):
     if not name or not name.strip():
         return None
     name = name.strip()
@@ -585,11 +593,27 @@ async def get_or_create_counterparty(name: str, user_id: int, db: AsyncSession):
         )
     )
     cp = result.scalars().first()
-    if not cp:
-        # Создаем нового, если не нашли
-        cp = Counterparty(name=name, user_id=user_id)
+    if cp:
+        # Если нашли — обновляем статистику использования
+        cp.use_count += 1
+        cp.last_use = datetime.utcnow()
+        # Если старый контрагент теперь используется как перевозчик — дописываем ему флаг
+        if is_carrier and not cp.is_carrier:
+            cp.is_carrier = True
+    else:
+        # Создаем абсолютно нового контрагента со всей статистикой
+        cp = Counterparty(
+            name=name, 
+            user_id=user_id,
+            is_carrier=is_carrier,
+            inn=inn,
+            address=address,
+            use_count=1,
+            last_use=datetime.utcnow()
+        )
         db.add(cp)
-        await db.flush() # Получаем ID без коммита всей транзакции
+        
+    await db.flush() # Выплескиваем в БД, чтобы зафиксировать изменения и получить ID
     return cp.id
 
 @app.get("/api/search/counterpartyold")
@@ -894,7 +918,8 @@ async def get_step_3(
         .options(
             selectinload(CargoOrder.shipper),
             selectinload(CargoOrder.consignee),
-            selectinload(CargoOrder.notify_party)
+            selectinload(CargoOrder.notify_party),
+            joinedload(CargoOrder.pre_carriage_carrier)
         )
         .where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
     )
@@ -942,6 +967,11 @@ async def save_step_3(
         form_data.get("consignee_name"), form_data.get("consignee_inn"), 
         form_data.get("consignee_address"), form_data.get("consignee_contact")
     )
+    order.pre_carriage_carrier_id = await sync_counterparty(
+        db, current_user.id, 
+        form_data.get("carrier_name"), form_data.get("carrier_inn"), 
+        form_data.get("carrier_address"), form_data.get("carrier_contact"), is_carrier=True
+    )
     
     notify_name = form_data.get("notify_name")
     order.notify_party_id = await get_or_create_counterparty(notify_name, current_user.id, db) if notify_name else None
@@ -957,7 +987,8 @@ async def save_step_3(
         # Свой вывоз: затираем адрес и контакт, сохраняем ТК клиента
         order.pre_carriage_address = None
         order.pre_carriage_contact = None
-        order.pre_carriage_carrier = form_data.get("pre_carriage_carrier")
+        if "pre_carriage_carrier" in form_data:
+            order.pre_carriage_carrier = form_data.get("pre_carriage_carrier")
     
     order.pre_carriage_date = parse_datetime(form_data.get("pre_carriage_date"))
     order.pre_carriage_comment = form_data.get("pre_carriage_comment")
@@ -994,6 +1025,7 @@ async def save_step_3(
             joinedload(CargoOrder.shipper),
             joinedload(CargoOrder.consignee),
             joinedload(CargoOrder.notify_party),
+            joinedload(CargoOrder.pre_carriage_carrier),
             selectinload(CargoOrder.containers).options(
                 selectinload(Container.items),
                 selectinload(Container.equipment)
@@ -1030,6 +1062,7 @@ async def get_step_4(
             joinedload(CargoOrder.shipper),
             joinedload(CargoOrder.consignee),
             joinedload(CargoOrder.notify_party),
+            joinedload(CargoOrder.pre_carriage_carrier),
             # Вытягиваем контейнеры, а внутри них — грузы и типы оборудования
             selectinload(CargoOrder.containers).options(
                 selectinload(Container.items),
