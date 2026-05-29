@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm 
 from app.helpers import validate_container_number
 from app.db import engine, Base, get_db, dadatoken
-from sqlalchemy import select, delete  
+from sqlalchemy import select, delete , update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
 from app.models import User, Counterparty, CargoOrder, UserRole, Port, TransportType, Equipment, Container, Company, CargoItem
@@ -1096,7 +1096,10 @@ async def list_orders(
             joinedload(CargoOrder.port_of_discharge),
             selectinload(CargoOrder.containers).joinedload(Container.equipment)
         )
-        .where(CargoOrder.owner_id == current_user.id)
+        .where(
+            CargoOrder.owner_id == current_user.id,
+            CargoOrder.is_valid == True
+        )
         .order_by(CargoOrder.id.desc())
     )
     orders = result.scalars().all()
@@ -1116,7 +1119,7 @@ async def delete_order(
     current_user: User = Depends(get_current_user)
 ):
     # 1. Сначала удаляем связанные контейнеры
-    await db.execute(
+    result = await db.execute(
         delete(Container).where(Container.order_id == order_id)
     )
     
@@ -1128,6 +1131,50 @@ async def delete_order(
         )
     )
     
+    await db.commit()
+    return HTMLResponse(status_code=200, content="")
+
+
+@app.post("/api/orders/{order_id}/cancel")
+async def cancel_order(
+    order_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # 1. Каскадно отменяем все связанные контейнеры этого заказа
+    container_query = (
+        update(Container)
+        .where(Container.order_id == order_id)
+        .values(
+            is_cancelled=True,
+            cancelled_by_id=current_user.id,
+            cancelled_at=datetime.utcnow(),
+            cancel_reason="Удален заказчиком"
+        )
+    )
+    await db.execute(container_query)
+    
+    # 2. Помечаем невалидным сам заказ
+    order_query = (
+        update(CargoOrder)
+        .where(
+            CargoOrder.id == order_id, 
+            CargoOrder.owner_id == current_user.id,
+            CargoOrder.is_valid == True
+        )
+        .values(is_valid=False)
+    )
+    
+    result = await db.execute(order_query)
+    
+    # Если живой заказ для этого пользователя не найден — откатываем транзакцию
+    if result.rowcount == 0:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Заказ не найден, уже отменен или у вас нет прав"
+        )
+        
     await db.commit()
     return HTMLResponse(status_code=200, content="")
 

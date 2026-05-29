@@ -70,6 +70,7 @@ class Counterparty(Base):
 class CargoOrder(Base):
     __tablename__ = "cargo_orders"
     id = Column(Integer, primary_key=True)
+    is_valid = Column(Boolean, default=True, nullable=False)
     owner_id = Column(Integer, ForeignKey("users.id"))
     status = Column(String, default="draft")
     transport_type = Column(Enum(TransportType))

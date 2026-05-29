@@ -113,13 +113,21 @@
                                 Просмотр
                             </button>
                         {% endif %}
-                        <button hx-delete="/api/orders/{{ order.id }}" 
-                            hx-confirm="Вы уверены, что хотите удалить этот заказ?"
-                            hx-target="closest tr" 
-                            hx-swap="outerHTML swap:1s"
-                            class="text-red-400 hover:text-red-600 transition">
-                        🗑️
-                    </button>
+                        <!--button hx-delete="/api/orders/{{ order.id }}" 
+                                hx-confirm="Вы уверены, что хотите удалить этот заказ?"
+                                hx-target="closest tr" 
+                                hx-swap="outerHTML swap:1s"
+                                class="text-red-400 hover:text-red-600 transition">
+                            🗑️
+                        </button-->
+                        <button hx-post="/api/orders/{{ order.id }}/cancel" 
+                                hx-confirm="Вы уверены, что хотите отменить этот заказ?"
+                                hx-target="closest tr" 
+                                hx-swap="outerHTML swap:1s"
+                                class="text-red-400 hover:text-red-600 transition"
+                                title="Отменить заказ">
+                            🗑️
+                        </button>
                     </td>
                 </tr>
                 <tr id="details-row-{{ order.id }}">
