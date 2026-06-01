@@ -1370,8 +1370,9 @@ async def operator_dashboard(
             .options(
                 joinedload(CargoOrder.port_of_loading),
                 joinedload(CargoOrder.port_of_discharge),
+                joinedload(CargoOrder.pre_carriage_carrier),
                 # Добавляем загрузку оборудования для отображения в списке
-                selectinload(CargoOrder.containers).options(joinedload(Container.equipment)),
+                selectinload(CargoOrder.containers).selectinload(Container.equipment),
                 joinedload(CargoOrder.owner).joinedload(User.company)
             )
             .where(CargoOrder.status != "draft")

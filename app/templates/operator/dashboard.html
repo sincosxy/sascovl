@@ -104,7 +104,7 @@
                                     {% if order.pre_carriage_required %}
                                         <span class="text-[10px] font-medium px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-100 rounded">🚛 Автодоставка</span>
                                     {% else %}
-                                        <span class="text-[10px] font-medium px-2 py-0.5 bg-orange-50 text-orange-700 border border-orange-100 rounded truncate" title="Свой вывоз ({{ order.pre_carriage_carrier }})">🏢 Свой вывоз</span>
+                                        <span class="text-[10px] font-medium px-2 py-0.5 bg-orange-50 text-orange-700 border border-orange-100 rounded truncate" title="Свой вывоз ({{ order.pre_carriage_carrier.name }})">🏢 Свой вывоз</span>
                                     {% endif %}
                                 </div>
                                 
