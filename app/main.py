@@ -1223,7 +1223,7 @@ async def get_order_details(
     if current_user.role not in [UserRole.ADMIN, UserRole.OPERATOR]:
         result = await db.execute(
             select(CargoOrder)
-            .options(selectinload(CargoOrder.containers).selectinload(Container.equipment))
+            .options(selectinload(CargoOrder.containers).selectinload(Container.equipment),joinedload(CargoOrder.pre_carriage_carrier))
             .where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
         )
     else:
@@ -1234,6 +1234,7 @@ async def get_order_details(
         )
     order = result.scalars().first()
     
+
     # Возвращаем маленький паршиал со списком
     return templates.TemplateResponse(
         request=request,
