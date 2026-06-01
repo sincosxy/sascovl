@@ -1229,7 +1229,7 @@ async def get_order_details(
     else:
         result = await db.execute(
             select(CargoOrder)
-            .options(selectinload(CargoOrder.containers).options(joinedload(Container.equipment)))
+            .options(selectinload(CargoOrder.containers).selectinload(Container.equipment),joinedload(CargoOrder.pre_carriage_carrier))
             .where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
         )
     order = result.scalars().first()
