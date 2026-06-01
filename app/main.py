@@ -63,6 +63,7 @@ app = FastAPI(title="CargoFlow API")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
 
 
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request, db: AsyncSession = Depends(get_db)):
     try:
@@ -1228,7 +1229,7 @@ async def get_order_details(
     else:
         result = await db.execute(
             select(CargoOrder)
-            .options(selectinload(CargoOrder.containers).joinedload(Container.equipment))
+            .options(selectinload(CargoOrder.containers).selectinload(Container.equipment))
             .where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
         )
     order = result.scalars().first()
@@ -1369,7 +1370,7 @@ async def operator_dashboard(
                 joinedload(CargoOrder.port_of_loading),
                 joinedload(CargoOrder.port_of_discharge),
                 # Добавляем загрузку оборудования для отображения в списке
-                selectinload(CargoOrder.containers).joinedload(Container.equipment),
+                selectinload(CargoOrder.containers).selectinload(Container.equipment),
                 joinedload(CargoOrder.owner).joinedload(User.company)
             )
             .where(CargoOrder.status != "draft")
