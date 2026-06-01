@@ -1229,7 +1229,7 @@ async def get_order_details(
     else:
         result = await db.execute(
             select(CargoOrder)
-            .options(selectinload(CargoOrder.containers).selectinload(Container.equipment))
+            .options(selectinload(CargoOrder.containers).options(joinedload(Container.equipment)))
             .where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
         )
     order = result.scalars().first()
@@ -1370,7 +1370,7 @@ async def operator_dashboard(
                 joinedload(CargoOrder.port_of_loading),
                 joinedload(CargoOrder.port_of_discharge),
                 # Добавляем загрузку оборудования для отображения в списке
-                selectinload(CargoOrder.containers).selectinload(Container.equipment),
+                selectinload(CargoOrder.containers).options(joinedload(Container.equipment)),
                 joinedload(CargoOrder.owner).joinedload(User.company)
             )
             .where(CargoOrder.status != "draft")
