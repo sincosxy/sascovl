@@ -44,7 +44,7 @@ def parse_datetime(dt_str: str) -> datetime | None:
 
 templates.env.filters["vlad_time"] = format_vladivostok_time
 
-router = APIRouter(prefix="/voyages", tags=["Operator Voyages"])
+router = APIRouter(prefix="/voyages", redirect_slashes=False, tags=["Operator Voyages"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
 
 @router.get("/", response_class=HTMLResponse)
