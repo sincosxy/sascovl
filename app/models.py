@@ -54,6 +54,43 @@ class Port(Base):
     code = Column(String, unique=True)
     is_active = Column(Boolean, default=True)
 
+class Vessel(Base):
+    __tablename__ = "vessels"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True, nullable=False, comment="Название рус.")
+    name_eng = Column(String, nullable=True, comment="Название англ.")
+    description = Column(String, nullable=True, comment="Описание")
+    voyage_count = Column(Integer, default=0, index=True, comment="Количество рейсов")
+    last_used_at = Column(DateTime, nullable=True, index=True, comment="Дата последнего использования")
+    voyages = relationship("Voyage", back_populates="vessel")
+
+class Voyage(Base):
+    """Модель рейса."""
+    __tablename__ = "voyages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    number = Column(String, nullable=False, unique=True, comment="Номер рейса")
+    voyage_date = Column(Date, nullable=False, comment="Дата рейса (оформления)")
+    departure_date = Column(Date, nullable=True, comment="Дата отхода")
+    arrival_date = Column(Date, nullable=True, comment="Дата прихода")
+
+    # Внешние ключи
+    vessel_id = Column(Integer, ForeignKey("vessels.id"), nullable=False)
+    departure_port_id = Column(Integer, ForeignKey("ports.id"), nullable=False)
+    destination_port_id = Column(Integer, ForeignKey("ports.id"), nullable=False)
+
+    # Отношения (Relationships)
+    vessel = relationship("Vessel", back_populates="voyages")
+    departure_port = relationship("Port", foreign_keys=[departure_port_id])
+    destination_port = relationship("Port", foreign_keys=[destination_port_id])
+    
+    # Отношение к контейнерам, закрепленным за рейсом
+    containers = relationship("Container", back_populates="voyage")
+
+
+
+
 class Counterparty(Base):
     __tablename__ = "counterparties"
     id = Column(Integer, primary_key=True)
@@ -160,6 +197,8 @@ class Container(Base):
     order = relationship("CargoOrder", back_populates="containers")
     equipment = relationship("Equipment")
     items = relationship("CargoItem", back_populates="container", cascade="all, delete-orphan")
+    voyage_id = Column(Integer, ForeignKey("voyages.id"), nullable=True)
+    voyage = relationship("Voyage", back_populates="containers")
 
 class CargoItem(Base):
     __tablename__ = "cargo_items"

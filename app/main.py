@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, status, Request, Response, 
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm 
 from app.helpers import validate_container_number
+from app.operator_routes import router as voyages_router
 from app.db import engine, Base, get_db, dadatoken
 from sqlalchemy import select, delete , update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,6 +40,8 @@ SMTP_PASSWORD = "password"
 
 templates = Jinja2Templates(directory="app/templates")
 
+
+
 # Регистрируем фильтр локального времени Владивостока
 def format_vladivostok_time(dt_utc):
     if not dt_utc:
@@ -61,7 +64,7 @@ templates.env.filters["vlad_time"] = format_vladivostok_time
 
 app = FastAPI(title="CargoFlow API")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
-
+app.include_router(voyages_router)
 
 
 @app.get("/", response_class=HTMLResponse)

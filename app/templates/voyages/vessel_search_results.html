@@ -1,0 +1,42 @@
+<div class="bg-white border shadow-xl rounded-md mt-1" 
+     style="width: 100%; max-height: 220px; overflow-y: auto; background: white; border: 1px solid #cbd5e0; border-radius: 4px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+    
+    {% if is_history and vessels %}
+    <div style="padding: 4px 8px; font-size: 11px; color: #718096; background: #edf2f7; font-weight: bold;">
+        Недавние и частые суда:
+    </div>
+    {% endif %}
+
+    {# --- СУДА ИЗ БАЗЫ ДАННЫХ --- #}
+    {% for vessel in vessels %}
+    <div style="padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #edf2f7;"
+         class="hover-bg-blue"
+         onclick="selectVessel('{{ vessel.id }}', '{{ vessel.name }} ({{ vessel.name_eng }})')">
+        <strong>{{ vessel.name }}</strong> 
+        <span style="color: #718096; font-size: 13px;">({{ vessel.name_eng }})</span>
+    </div>
+    {% endfor %}
+
+    {# --- КНОПКА ДОБАВЛЕНИЯ НОВОГО СУДНА --- #}
+    <div style="padding: 10px 12px; cursor: pointer; background: #f7fafc; color: #3182ce; font-weight: bold; border-top: 1px solid #e2e8f0;"
+         hx-get="/voyages/vessels/new"
+         hx-target="#vessel-modal-container"
+         hx-swap="innerHTML"
+         hx-include="#vessel_display_name"
+         onclick="document.getElementById('vessel-results-container').style.display = 'none';">
+        ➕ Добавить новое судно {% if request.query_params.get('q') %} "{{ request.query_params.get('q') }}" {% endif %}
+    </div>
+</div>
+
+<script>
+    // Маленькая JS-функция для выбора судна
+    function selectVessel(id, displayName) {
+        document.getElementById('vessel_id_hidden').value = id;
+        document.getElementById('vessel_display_name').value = displayName;
+        document.getElementById('vessel-results-container').style.display = 'none';
+    }
+</script>
+
+<style>
+    .hover-bg-blue:hover { background-color: #ebf8ff; }
+</style>

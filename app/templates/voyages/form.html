@@ -1,0 +1,139 @@
+<!-- Контейнер модалки с размытием фона и плавной анимацией появления -->
+<div 
+    class="relative w-full max-w-lg bg-white rounded-xl shadow-xl border border-gray-100 flex flex-col overflow-hidden m-4 transform transition-all"
+    x-data="{ open: true }"
+    x-show="open"
+    x-transition:enter="ease-out duration-200"
+    x-transition:enter-start="opacity-0 scale-95"
+    x-transition:enter-end="opacity-100 scale-100"
+    @keydown.escape.window="document.body.dispatchEvent(new Event('close-voyage-modal'))"
+>
+    <!-- Шапка модального окна -->
+    <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+        <h3 class="text-base font-bold text-gray-800">
+            {% if voyage %}Редактировать рейс {{ voyage.number }}{% else %}Создать новый рейс{% endif %}
+        </h3>
+        <button 
+            type="button" 
+            @click="document.body.dispatchEvent(new Event('close-voyage-modal'))" 
+            class="text-gray-400 hover:text-gray-600 cursor-pointer text-xl p-1 transition"
+        >
+            &times;
+        </button>
+    </div>
+    
+    <!-- Тело формы -->
+    <form
+        {% if voyage %}
+            hx-put="/voyages/{{ voyage.id }}"
+            hx-target="#voyage-row-{{ voyage.id }}"
+            hx-swap="outerHTML"
+        {% else %}
+            hx-post="/voyages/"
+            hx-target="#voyages-table-body"
+            hx-swap="beforeend"
+        {% endif %}
+        class="p-6 flex flex-col gap-4 text-sm text-gray-700"
+    >    
+        <!-- Номер рейса -->
+        <div class="flex flex-col gap-1.5">
+            <label class="font-semibold text-gray-700">Номер рейса:</label>
+            <input type="text" name="number" value="{{ voyage.number if voyage else '' }}" required 
+                   class="w-full p-2 border border-gray-300 rounded-lg focus:outline-hidden focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition">
+        </div>
+
+        <!-- Выбор судна (Умный инпут с Alpine.js) -->
+        <div class="vessel-group relative flex flex-col gap-1.5" x-data="{ dropdownOpen: false }">
+            <label class="font-semibold text-gray-700">Судно:</label>
+            <input type="hidden" name="vessel_id" id="vessel_id_hidden" value="{{ voyage.vessel_id if voyage else '' }}" required>
+            
+            <input type="text" name="vessel_display_name" autocomplete="off" id="vessel_display_name"
+                hx-get="/voyages/vessels/search" 
+                hx-trigger="keyup changed delay:300ms, focus" 
+                hx-target="#vessel-results-container"
+                hx-swap="innerHTML"
+                value="{% if voyage and voyage.vessel %}{{ voyage.vessel.name }} {% endif %}"
+                placeholder="Начните вводить название судна..."
+                class="w-full p-2 border border-gray-300 rounded-lg focus:outline-hidden focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition"
+                @focus="dropdownOpen = true"
+                @click.away="dropdownOpen = false"
+            >
+            <!-- Контейнер для выпадающего списка -->
+            <div id="vessel-results-container" x-show="dropdownOpen" class="absolute top-[100%] left-0 w-full z-50" style="display: none;" x-transition></div>
+        </div>
+
+        <!-- Порты (Две колонки) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="flex flex-col gap-1.5">
+                <label class="font-semibold text-gray-700">Порт отправления:</label>
+                <select name="departure_port_id" required class="w-full p-2 border border-gray-300 rounded-lg bg-white focus:outline-hidden focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition">
+                    <option value="">-- Выберите порт --</option>
+                    {% for port in ports %}
+                        <option value="{{ port.id }}" {% if voyage and voyage.departure_port_id == port.id %}selected{% endif %}>{{ port.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+                <label class="font-semibold text-gray-700">Порт назначения:</label>
+                <select name="destination_port_id" required class="w-full p-2 border border-gray-300 rounded-lg bg-white focus:outline-hidden focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition">
+                    <option value="">-- Выберите порт --</option>
+                    {% for port in ports %}
+                        <option value="{{ port.id }}" {% if voyage and voyage.destination_port_id == port.id %}selected{% endif %}>{{ port.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        
+        <!-- Даты (Три колонки) -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="flex flex-col gap-1.5">
+                <label class="font-semibold text-xs text-gray-500 uppercase tracking-wider">Оформление:</label>
+                <input type="date" name="voyage_date" value="{{ voyage.voyage_date if voyage else '' }}" required class="w-full p-2 border border-gray-300 rounded-lg focus:outline-hidden focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition text-xs">
+            </div>
+            <div class="flex flex-col gap-1.5">
+                <label class="font-semibold text-xs text-emerald-600 uppercase tracking-wider">Отход (ETD):</label>
+                <input type="date" name="departure_date" value="{{ voyage.departure_date if voyage else '' }}" required class="w-full p-2 border border-emerald-300 bg-emerald-50/20 text-emerald-900 rounded-lg focus:outline-hidden focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition text-xs">
+            </div>
+            <div class="flex flex-col gap-1.5">
+                <label class="font-semibold text-xs text-blue-600 uppercase tracking-wider">Приход (ETA):</label>
+                <input type="date" name="arrival_date" value="{{ voyage.arrival_date if voyage else '' }}" required class="w-full p-2 border border-blue-300 bg-blue-50/20 text-blue-900 rounded-lg focus:outline-hidden focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition text-xs">
+            </div>
+        </div>
+        
+        <!-- Кнопки управления -->
+        <div class="flex justify-end gap-3 mt-4 pt-4 border-t border-gray-100">
+            <button 
+                type="button" 
+                @click="document.body.dispatchEvent(new Event('close-voyage-modal'))" 
+                class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold text-xs cursor-pointer transition"
+            >
+                Отмена
+            </button>
+            <button 
+                type="submit" 
+                class="bg-blue-600 hover:bg-blue-700 active:scale-98 text-white px-5 py-2 rounded-lg font-semibold text-xs cursor-pointer transition shadow-md shadow-blue-600/10"
+            >
+                Сохранить рейс
+            </button>
+        </div>
+    </form>
+    
+    <!-- Дочерний контейнер для быстрого создания судна -->
+    <div id="vessel-modal-container" class="contents"></div>
+</div>
+
+<script>
+    // Глобальный JS-слушатель для триггера создания судна из бэкенда
+    window.addEventListener('vesselCreated', function(evt) {
+        const newVessel = evt.detail; 
+        const idInput = document.getElementById('vessel_id_hidden');
+        const nameInput = document.getElementById('vessel_display_name');
+        
+        if (idInput) idInput.value = newVessel.id;
+        if (nameInput) nameInput.value = newVessel.name;
+        
+        const quickModal = document.getElementById('vessel-quick-modal');
+        if (quickModal) quickModal.remove();
+    });
+</script>
