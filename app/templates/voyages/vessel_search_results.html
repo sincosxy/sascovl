@@ -11,7 +11,7 @@
     {% for vessel in vessels %}
     <div style="padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #edf2f7;"
          class="hover-bg-blue"
-         onclick="selectVessel('{{ vessel.id }}', '{{ vessel.name }} ({{ vessel.name_eng }})')">
+         @mousedown="selectVessel('{{ vessel.id }}', '{{ vessel.name }} ({{ vessel.name_eng }})')">
         <strong>{{ vessel.name }}</strong> 
         <span style="color: #718096; font-size: 13px;">({{ vessel.name_eng }})</span>
     </div>
@@ -23,7 +23,7 @@
          hx-target="#vessel-modal-container"
          hx-swap="innerHTML"
          hx-include="#vessel_display_name"
-         onclick="document.getElementById('vessel-results-container').style.display = 'none';">
+         @mousedown="document.getElementById('vessel-results-container').style.display = 'none';">
         ➕ Добавить новое судно {% if request.query_params.get('q') %} "{{ request.query_params.get('q') }}" {% endif %}
     </div>
 </div>
