@@ -126,6 +126,7 @@ async def import_schedule(
         # Парсим строку параметров
         date_from_str, date_to_str, vessel_name, voyage_number = item.split('|')
         clean_vessel_name = vessel_name.strip()
+        clean_voyage_number = voyage_number.strip()
         
         # 1. Асинхронный запрос SQLAlchemy 2.0 для проверки судна (регистронезависимо)
         stmt = select(Vessel).where(Vessel.name.ilike(clean_vessel_name))
@@ -137,7 +138,21 @@ async def import_schedule(
             vessel = Vessel(name=clean_vessel_name)
             db.add(vessel)
             await db.flush()  # Асинхронно генерируем vessel.id в БД
-            
+
+        voyage_stmt = select(Voyage).where(
+            Voyage.vessel_id == vessel.id,
+            Voyage.departure_port_id == pol_id,
+            Voyage.destination_port_id == pod_id,
+            Voyage.number == clean_voyage_number
+        )
+
+        voyage_result = await db.execute(voyage_stmt)
+        existing_voyage = voyage_result.scalars().first()
+        
+        if existing_voyage:
+            # Если рейс найден — просто пропускаем итерацию, не добавляя дубликат
+            continue
+
         # Парсим даты
         date_from = datetime.strptime(date_from_str, "%d.%m.%Y").date()
         date_to = datetime.strptime(date_to_str, "%d.%m.%Y").date()

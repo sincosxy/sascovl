@@ -37,7 +37,7 @@
             </tr>
         </thead>
         
-        <tbody id="voyages-table-body" class="divide-y divide-gray-100 [&>tr]:transition-colors [&>tr]:duration-150 hover:[&>tr]:bg-gray-50/70">
+        <tbody id="voyages-table-body" class="divide-y divide-gray-100 [&>tr]:transition-colors [&>tr]:duration-150 hover:[&>tr]:bg-gray-50/70 has-[tr:not(.empty-row)]:[&_.empty-row]:hidden">
         {% for voyage in voyages %}
             {% include "voyages/vessel_row.html" %}
         {% else %}
