@@ -43,7 +43,7 @@
         </div>
 
         <!-- Выбор судна (Умный инпут с Alpine.js) -->
-        <div class="vessel-group relative flex flex-col gap-1.5" x-data="{ dropdownOpen: false }">
+        <div class="vessel-group relative flex flex-col gap-1.5" x-data="{ dropdownOpen: false }" @focusout="if (!$el.contains($event.relatedTarget)) dropdownOpen = false">
             <label class="font-semibold text-gray-700">Судно:</label>
             <input type="hidden" name="vessel_id" id="vessel_id_hidden" value="{{ voyage.vessel_id if voyage else '' }}" required>
             
@@ -56,9 +56,9 @@
                 placeholder="Начните вводить название судна..."
                 class="w-full p-2 border border-gray-300 rounded-lg focus:outline-hidden focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition"
                 @focus="dropdownOpen = true"
-                @click.away="dropdownOpen = false"
+                
             >
-            <!-- Контейнер для выпадающего списка -->
+            <!-- Контейнер для выпадающего списка @click.away="dropdownOpen = false"-->
             <div id="vessel-results-container" x-show="dropdownOpen" class="absolute top-[100%] left-0 w-full z-50" style="display: none;" x-transition></div>
         </div>
 
