@@ -98,6 +98,106 @@ async def edit_voyage_form(request: Request, voyage_id: int, db: AsyncSession = 
         }
     )
 
+@router.get("/schedule-modal", response_class=HTMLResponse)
+async def get_schedule_modal(request: Request, db: AsyncSession = Depends(get_db)):
+    # 1. Получаем список всех активных портов для селектов POL/POD
+    ports_result = await db.execute(select(Port).order_by(Port.name))
+    ports = ports_result.scalars().all()
+    
+    # 2. Рендерим и возвращаем HTML-код модалки по новому стандарту
+    return templates.TemplateResponse(
+        name="voyages/schedule_modal.html",
+        request=request,
+        context={"ports": ports}
+    )
+
+@router.post("/import-schedule")
+async def import_schedule(
+    request: Request,
+    selected_voyages: list[str] = Form([]), 
+    pol_id: int = Form(...),
+    pod_id: int = Form(...),
+    order_id: Optional[int] = Form(None),
+    db: AsyncSession = Depends(get_db)  # Используем AsyncSession
+):
+    inserted_voyages = []
+    
+    for item in selected_voyages:
+        # Парсим строку параметров
+        date_from_str, date_to_str, vessel_name, voyage_number = item.split('|')
+        clean_vessel_name = vessel_name.strip()
+        
+        # 1. Асинхронный запрос SQLAlchemy 2.0 для проверки судна (регистронезависимо)
+        stmt = select(Vessel).where(Vessel.name.ilike(clean_vessel_name))
+        result = await db.execute(stmt)
+        vessel = result.scalars().first()
+        
+        if not vessel:
+            # Если судна нет — создаем
+            vessel = Vessel(name=clean_vessel_name)
+            db.add(vessel)
+            await db.flush()  # Асинхронно генерируем vessel.id в БД
+            
+        # Парсим даты
+        date_from = datetime.strptime(date_from_str, "%d.%m.%Y").date()
+        date_to = datetime.strptime(date_to_str, "%d.%m.%Y").date()
+        
+        # 2. Создаем рейс
+        new_voyage = Voyage(
+            vessel_id=vessel.id,
+            number=voyage_number.strip(),
+            voyage_date=date_from,
+            departure_date=date_from,
+            arrival_date=date_to,
+            departure_port_id=pol_id,
+            destination_port_id=pod_id
+        )
+        db.add(new_voyage)
+        inserted_voyages.append(new_voyage)
+        
+    # Фиксируем транзакцию в базе данных
+    await db.commit()
+    
+    # 3. Подгружаем связанные объекты Vessel для корректного рендеринга строк таблицы
+    # (чтобы внутри vessel_row.html работал вызов типа {{ voyage.vessel.name }})
+    #for voyage in inserted_voyages:
+    #    await db.refresh(voyage, ["vessel"])
+    voyage_ids = [v.id for v in inserted_voyages]
+    
+    stmt = (
+        select(Voyage)
+        .where(Voyage.id.in_(voyage_ids))
+        .options(
+            selectinload(Voyage.vessel),
+            selectinload(Voyage.departure_port),
+            selectinload(Voyage.destination_port),
+            selectinload(Voyage.containers)
+        )
+    )
+    result = await db.execute(stmt)
+
+    inserted_voyages = result.scalars().all()
+
+
+    
+    # 4. Рендерим HTML-строки для отправки в HTMX
+    response_html = ""
+    for voyage in inserted_voyages:
+        # Корректный TemplateResponse по новому стандарту FastAPI
+        rendered_row = templates.TemplateResponse(
+            name="voyages/vessel_row.html",
+            request=request,
+            context={"voyage": voyage}
+        ).body.decode("utf-8")
+        response_html += rendered_row
+        
+    # Возвращаем результат и триггерим закрытие модалки на фронтенде
+    response = Response(content=response_html, media_type="text/html")
+    response.headers["HX-Trigger"] = "close-voyage-modal"
+    
+    return response
+
+
 
 @router.get("/new", response_class=HTMLResponse)
 async def new_voyage_form(request: Request, db: AsyncSession = Depends(get_db)):

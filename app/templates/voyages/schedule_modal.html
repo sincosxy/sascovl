@@ -1,0 +1,82 @@
+<div class="bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+     @click.outside="$dispatch('close-voyage-modal')">
+    
+    <!-- Шапка модалки -->
+    <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <span>📅</span> Подбор рейса по расписанию
+        </h3>
+        <button type="button" 
+                onclick="document.body.dispatchEvent(new Event('close-voyage-modal'))"
+                class="text-gray-400 hover:text-gray-600 text-xl cursor-pointer p-1">
+            ✕
+        </button>
+    </div>
+
+    <!-- Тело модалки -->
+    <div class="p-6">
+        <!-- Форма фильтров -->
+        <form class="grid grid-cols-3 gap-4 mb-6">
+            <!-- Дата готовности -->
+            <div>
+                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Готовность груза</label>
+                <input type="hidden" name="order_id" value="{{ order_id if order_id else '1' }}">
+                <input type="date" name="ready_date" 
+                       hx-get="/api/v1/schedule/view"
+                       hx-trigger="change"
+                       hx-target="#schedule-results"
+                       hx-include="[name='pol_id'], [name='pod_id'], [name='ready_date']"
+                       class="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-hidden">
+            </div>
+
+            <!-- Порт погрузки (POL) -->
+            <div>
+                <label class="block text-xs font-semibold text-blue-700 uppercase tracking-wider mb-1">Порт погрузки (POL)</label>
+                <select name="pol_id" required
+                    hx-get="/api/v1/schedule/view" 
+                    hx-trigger="change" 
+                    hx-target="#schedule-results" 
+                    hx-include="[name='pol_id'], [name='pod_id'], [name='ready_date']"
+                    class="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-hidden">
+                    <option value="" disabled selected>Выберите POL...</option>
+                    {% for port in ports %}
+                    <option value="{{ port.id }}">{{ port.name }} ({{ port.code }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Порт выгрузки (POD) -->
+            <div>
+                <label class="block text-xs font-semibold text-green-700 uppercase tracking-wider mb-1">Порт выгрузки (POD)</label>
+                <select name="pod_id" required
+                    hx-get="/api/v1/schedule/view" 
+                    hx-trigger="change" 
+                    hx-target="#schedule-results" 
+                    hx-include="[name='pol_id'], [name='pod_id'], [name='ready_date'], [name='order_id']"
+                    class="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-hidden">
+                    <option value="" disabled selected>Выберите POD...</option>
+                    {% for port in ports %}
+                    <option value="{{ port.id }}">{{ port.name }} ({{ port.code }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+
+        <!-- Контейнер для динамических результатов -->
+        <div id="schedule-results" class="border border-dashed border-gray-200 rounded-lg min-h-[200px] flex items-center justify-center text-gray-400 text-sm p-4 bg-gray-50/30">
+            <div class="text-center">
+                <div class="text-3xl mb-2">🔍</div>
+                Укажите порты отправления и назначения для вывода расписания
+            </div>
+        </div>
+    </div>
+
+    <!-- Подвал модалки -->
+    <div class="p-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-2">
+        <button type="button" 
+                onclick="document.body.dispatchEvent(new Event('close-voyage-modal'))"
+                class="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-100 cursor-pointer transition">
+            Закрыть
+        </button>
+    </div>
+</div>

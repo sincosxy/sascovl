@@ -347,6 +347,62 @@ async def schedule_view(pol_id: int = None, pod_id: int = None, order_id: int = 
     if not data or not data.get('data'):
         return "<div class='p-3 text-sm text-amber-600 bg-amber-50 rounded'>Рейсы не найдены</div>"
 
+    # Обертываем всё в форму HTMX, которая отправит выбранные чекбоксы на бэкенд
+    html = """
+    <form hx-post="/voyages/import-schedule" 
+          hx-target="#voyages-table-body" 
+          hx-swap="beforeend"
+          class="space-y-4 w-full">
+    <div class="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+
+    """
+    html += f'<input type="hidden" name="pol_id" value="{pol_id}">'
+    html += f'<input type="hidden" name="pod_id" value="{pod_id}">'
+    for idx, ship in enumerate(data['data'][0]['schedule']):
+        # Кодируем данные рейса в value чекбокса, чтобы бэкенд мог их прочитать
+        # Формат: dateFrom|dateTo|transportName|voyageNumber
+        v_value = f"{ship['dateFrom']}|{ship['dateTo']}|{ship['transportName']}|{ship['voyageNumber']}"
+        
+        html += f"""
+        <label class="p-3 border border-gray-200 rounded-lg bg-white shadow-xs flex justify-between items-center text-sm hover:bg-gray-50/50 cursor-pointer transition select-none">
+            <div class="flex items-center gap-3">
+                <!-- Чекбокс для выбора -->
+                <input type="checkbox" name="selected_voyages" value="{v_value}" 
+                       class="w-4 h-4 text-blue-600 border-gray-300 rounded-sm focus:ring-blue-500">
+                <div>
+                    <span class="font-bold text-gray-700">{ship['dateFrom']}</span> 
+                    <span class="text-gray-400">→</span> 
+                    <span class="font-bold text-gray-700">{ship['dateTo']}</span>
+                    <div class="text-blue-600 font-semibold flex items-center gap-1 mt-0.5">
+                        <span>🚢</span> {ship['transportName']}
+                    </div>
+                </div>
+            </div>
+            <div class="text-right">
+                <span class="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-sm">
+                    Рейс: {ship['voyageNumber']}
+                </span>
+            </div>
+        </label>
+        """
+        
+    html += f"""
+    </div>
+    <!-- Скрытый инпут order_id, если он пришел в фильтрах, чтобы тоже улетел в POST -->
+    <input type="hidden" name="order_id" value="{order_id if order_id else ''}">
+    
+    <!-- Финальная кнопка действия -->
+    <div class="pt-2 border-t border-gray-100 flex justify-end">
+        <button type="submit" 
+                class="bg-blue-600 hover:bg-blue-700 active:scale-98 text-white px-5 py-2 rounded-lg font-semibold text-sm cursor-pointer transition shadow-md shadow-blue-600/20">
+            ✅ Добавить в базу
+        </button>
+    </div>
+    </form>
+    """
+    return html
+    
+def test():    
     # 3. Формируем HTML (можно через Jinja2 шаблон или f-строку)
     html = '<div class="space-y-2">'
     for ship in data['data'][0]['schedule']:
@@ -1233,7 +1289,7 @@ async def get_order_details(
         result = await db.execute(
             select(CargoOrder)
             .options(selectinload(CargoOrder.containers).selectinload(Container.equipment),joinedload(CargoOrder.pre_carriage_carrier))
-            .where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
+            .where(CargoOrder.id == order_id) #, CargoOrder.owner_id == current_user.id)
         )
     order = result.scalars().first()
     

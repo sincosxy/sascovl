@@ -26,12 +26,14 @@
             <div>
                 <label class="block text-xs font-semibold text-blue-700 uppercase">Порт погрузки (POL)</label>
                 <select name="pol_id" required
+                    {# закоментил выпадение расписания
                     hx-get="/api/v1/schedule/view" 
                     hx-trigger="change" 
                     hx-target="#schedule-results" 
                     hx-include="[name='pol_id'], [name='pod_id'], [name='order_id']"
+                    #}
                     class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2 bg-white">
-                    <!--option value="" disabled {% if not order.pol_id %}selected{% endif %}>Выберите порт...</option-->
+                    <option value="" disabled {% if not order.pol_id %}selected{% endif %}>Выберите порт...</option>
                     {% for port in ports %}
                     <option value="{{ port.id }}" {% if order and order.pol_id == port.id %}selected{% elif not order and loop.first %}selected{% endif %}>{{ port.name }} ({{ port.code }})</option>
                     {% endfor %}
@@ -40,10 +42,12 @@
             <div>
                 <label class="block text-xs font-semibold text-blue-700 uppercase">Порт выгрузки (POD)</label>
                 <select name="pod_id" required
+                    {#
                     hx-get="/api/v1/schedule/view" 
                     hx-trigger="change" 
                     hx-target="#schedule-results" 
                     hx-include="[name='pol_id'], [name='pod_id'], [name='order_id']"
+                    #}
                     class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2 bg-white">
                     <option value="" disabled {% if not order.pod_id %}selected{% endif %}>Выберите порт...</option>
                     {% for port in ports %}

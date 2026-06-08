@@ -70,7 +70,7 @@ class Voyage(Base):
     __tablename__ = "voyages"
 
     id = Column(Integer, primary_key=True, index=True)
-    number = Column(String, nullable=False, unique=True, comment="Номер рейса")
+    number = Column(String, nullable=False, unique=False, comment="Номер рейса")
     voyage_date = Column(Date, nullable=False, comment="Дата рейса (оформления)")
     departure_date = Column(Date, nullable=True, comment="Дата отхода")
     arrival_date = Column(Date, nullable=True, comment="Дата прихода")
