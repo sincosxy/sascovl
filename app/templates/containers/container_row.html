@@ -1,5 +1,7 @@
 <tr id="container-row-{{ container.id }}" class="{% if container.is_cancelled %}bg-red-50 opacity-60{% endif %} transition-all">
-    <td class="px-4 py-2 border-b font-mono">{{ container.container_number or '---' }}</td>
+    <td class="px-4 py-2 border-b font-mono {% if container.valid_number == False %}text-red-600 font-bold{% endif %}">
+        {{ container.container_number or '---' }}
+    </td>
     <td class="px-6 py-4 border-b">
         {% if container.order %}
             <div class="font-semibold text-gray-900">Заказ #{{ container.order.id }}</div>
