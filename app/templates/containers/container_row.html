@@ -1,0 +1,87 @@
+<tr id="container-row-{{ container.id }}" class="{% if container.is_cancelled %}bg-red-50 opacity-60{% endif %} transition-all">
+    <td class="px-4 py-2 border-b font-mono">{{ container.container_number or '---' }}</td>
+    <td class="px-6 py-4 border-b">
+        {% if container.order %}
+            <div class="font-semibold text-gray-900">Заказ #{{ container.order.id }}</div>
+            <!-- Замените .booking_number на ваше имя поля поручения/букинга -->
+            <div class="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                🏢 
+                {% if container.order.owner and container.order.owner.company %}
+                    <!-- Выводим имя компании -->
+                    <span class="text-blue-600 font-medium">{{ container.order.owner.company.name }}</span>
+                {% else %}
+                    <span class="text-gray-400 italic">Компания не указана</span>
+                {% endif %}
+            </div>
+        {% else %}
+            <span class="text-gray-400 text-xs">Без заказа</span>
+        {% endif %}
+    </td>
+    <td class="px-4 py-2 border-b">
+        <span class="badge">{{ container.equipment.name if container.equipment else container.equipment_id }}</span>
+    </td>
+    <td class="px-4 py-2 border-b">
+        <div class="text-xs">
+            <div>SOC: {{ '✅' if container.is_soc else '❌' }}</div>
+            <div>LCL: {{ '✅' if container.is_lcl else '❌' }}</div>
+        </div>
+    </td>
+    <td class="px-4 py-2 border-b">
+        <div>{{ container.weight_gross or 0 }} кг</div>
+        <div class="text-xs text-gray-500">{{ container.pieces or 0 }} мест</div>
+    </td>
+    <td class="px-4 py-2 border-b text-sm max-w-xs truncate" title="{{ container.cargo_description }}">
+        {{ container.cargo_description or '---' }}
+    </td>
+    <td class="px-4 py-2 border-b font-mono text-xs">
+        <div>Пломба: {{ container.seal or '---' }}</div>
+        <div>Пин: {{ container.pin_code or '---' }}</div>
+    </td>
+    <td class="px-4 py-2 border-b text-xs">
+        {% if container.temperature is not none %}
+            <div class="text-blue-600 font-bold">🌡️ {{ container.temperature }}°C</div>
+        {% else %}
+            <span class="text-gray-400">Сухой</span>
+        {% endif %}
+    </td>
+    <td class="px-4 py-2 border-b text-xs">
+        {% if container.is_cancelled %}
+            <span class="text-red-600 font-semibold" title="Причина: {{ container.cancel_reason }}">Отменен</span>
+        {% else %}
+            <span class="text-green-600">Активен</span>
+        {% endif %}
+    </td>
+    <!-- Новая колонка Действий -->
+    <td class="px-4 py-2 border-b text-xs text-right">
+        {% if not container.is_cancelled %}
+            <!-- Форма отмены контейнера -->
+            <form hx-post="/containers/{{ container.id }}/cancel" 
+                hx-target="#container-row-{{ container.id }}" 
+                hx-swap="outerHTML"
+                class="flex items-center justify-end gap-1"
+                onsubmit="return confirm('Уверен, что хочешь отменить контейнер?')">
+                <input type="text" name="cancel_reason" placeholder="Причина" required 
+                    class="border p-1 rounded text-xs w-28">
+                <button type="submit" class="bg-white-500 text-white px-2 py-1 rounded hover:bg-red-600" title="Отменить">
+                    ❌
+                </button>
+            </form>
+        {% else %}
+            <!-- Блок отмененного контейнера + Кнопка Восстановления -->
+            <div class="flex flex-col items-end gap-1">
+                <div class="flex items-center gap-2">
+                    <span class="text-red-600 font-semibold uppercase text-[10px]">Отменен</span>
+                    
+                    <!-- Кнопка восстановления через HTMX -->
+                    <button hx-post="/containers/{{ container.id }}/restore"
+                            hx-target="#container-row-{{ container.id }}"
+                            hx-swap="outerHTML"
+                            hx-confirm="Восстановить этот контейнер?"
+                            class="bg-white-600 hover:bg-green-700 text-white px-2 py-0.5 rounded text-[11px] font-large transition-colors">
+                        🔄
+                    </button>
+                </div>
+            </div>
+        {% endif %}
+    </td>
+</tr>

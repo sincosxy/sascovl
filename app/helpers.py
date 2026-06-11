@@ -1,4 +1,6 @@
 import requests, json
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 
 def validate_container_number(number: str) -> bool:
@@ -92,3 +94,21 @@ def get_schedule(token, date_from, from_loc, to_loc):
     
     print(f"🔍 Ищем расписание: {from_loc} ({from_id}) -> {to_loc} ({to_id}) на {date_from}...")
     return fit_request('POST', 'https://api.fesco.com/api/v1/lk/schedule/sea', token, payload)
+
+
+# Регистрируем фильтр локального времени Владивостока
+def format_vladivostok_time(dt_utc):
+    if not dt_utc:
+        return ""
+    if dt_utc.tzinfo is None:
+        dt_utc = dt_utc.replace(tzinfo=ZoneInfo("UTC"))
+    local_dt = dt_utc.astimezone(ZoneInfo("Asia/Vladivostok"))
+    return local_dt.strftime("%d.%m.%Y %H:%M")
+
+def parse_datetime(dt_str: str) -> datetime | None:
+    if not dt_str:
+        return None
+    try:
+        return datetime.strptime(dt_str, "%Y-%m-%dT%H:%M")
+    except ValueError:
+        return None

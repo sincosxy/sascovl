@@ -1,0 +1,18 @@
+<ul class="divide-y divide-gray-100" id="search-results">
+    {% for client in clients %}
+    <li class="p-3 hover:bg-gray-50 cursor-pointer text-sm"
+        @click="selectedClient = { id: {{ client.id }}, name: '{{ client.name }}', inn: '{{ client.inn }}' }; document.getElementById('search-results').classList.add('hidden')">
+        <div class="font-bold text-gray-800">{{ client.name }}</div>
+        <div class="text-xs text-gray-500">ИНН: {{ client.inn }} {% if client.email %} | {{ client.email }}{% endif %}</div>
+    </li>
+    {% else %}
+    <li class="p-4 text-sm text-gray-500 text-center">
+        Клиенты не найдены
+    </li>
+    {% endfor %}
+</ul>
+
+<script>
+    // Показываем блок с результатами, так как данные пришли
+    document.getElementById('search-results').classList.remove('hidden');
+</script>

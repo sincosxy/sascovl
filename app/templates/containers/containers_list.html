@@ -1,0 +1,63 @@
+<div class="p-6 bg-gray-50 min-h-screen">
+    <!-- Шапка страницы -->
+    <div class="mb-6 flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                📦 Управление контейнерами
+                <span class="text-sm font-normal px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
+                    {{ containers|length }} шт.
+                </span>
+            </h1>
+            <p class="text-sm text-gray-500 mt-1">Список активных, рефрижераторных и отмененных контейнеров оператора</p>
+        </div>
+        
+        <!-- Правая часть: Действия (HTMX) -->
+        <div class="flex items-center gap-3">
+            <!-- Кнопка обновления списка через HTMX -->
+            <button hx-get="/containers" 
+                    hx-select="#containers-table-container"
+                    hx-target="#containers-table-container"
+                    hx-swap="outerHTML"
+                    class="p-2 bg-white border border-gray-300 rounded-lg shadow-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                    title="Обновить список">
+                🔄
+            </button>
+            
+            <!-- Кнопка добавления нового контейнера -->
+            <button class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg shadow transition-colors text-sm flex items-center gap-1">
+                ➕ Добавить контейнер
+            </button>
+        </div>
+    </div>
+
+    <!-- Блок с таблицей (ему дадим id для точечного обновления списка) -->
+    <div id="containers-table-container" class="overflow-x-auto bg-white rounded-xl shadow-sm border border-gray-200">
+        <table class="min-w-full divide-y divide-gray-200 table-fixed"> <!-- table-fixed жестко держит ширину -->
+            <thead class="bg-gray-50">
+                <tr class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    <th class="w-1/4 px-6 py-4">Номер контейнера</th>
+                    <th class="w-1/6 px-6 py-4">Заказ / Поручение</th>
+                    <th class="w-1/12 px-6 py-4">Тип (EQ)</th>
+                    <th class="w-1/12 px-6 py-4">Флаги</th>
+                    <th class="w-1/12 px-6 py-4">Вес / Места</th>
+                    <th class="w-1/6 px-6 py-4">Описание груза</th>
+                    <th class="w-1/12 px-6 py-4">Документы</th>
+                    <th class="w-1/12 px-6 py-4">Реф. параметры</th>
+                    <th class="w-1/12 px-6 py-4">Статус</th>
+                    <th class="w-1/12 px-6 py-4 text-right">Действия</th>
+                </tr>
+            </thead>
+            <tbody id="containers-table-body" class="bg-white divide-y divide-gray-200">
+                {% for container in containers %}
+                    {% include "containers/container_row.html" %}
+                {% else %}
+                    <tr>
+                        <td colspan="9" class="text-center py-12 text-gray-400 text-sm">
+                            Контейнеры не найдены
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>

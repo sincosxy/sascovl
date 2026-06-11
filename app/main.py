@@ -1,8 +1,9 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Request, Response, Form, BackgroundTasks
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm 
-from app.helpers import validate_container_number
-from app.operator_routes import router as voyages_router
+from app.helpers import validate_container_number, get_schedule, format_vladivostok_time, parse_datetime
+from app.voyages_routes import router as voyages_router
+from app.containers_routes import router as containers_router
 from app.db import engine, Base, get_db, dadatoken
 from sqlalchemy import select, delete , update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,13 +12,13 @@ from app.models import User, Counterparty, CargoOrder, UserRole, Port, Transport
 from app.auth import verify_password, create_access_token, get_current_user, hash_password 
 from app.schemas import Token, UserLogin, CounterpartyCreate, CounterpartyRead, OrderRead, UserCreate
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, RedirectResponse
+
 from typing import List, Optional
 from datetime import datetime, date, timedelta
 import httpx, html
 from xhtml2pdf import pisa
 from io import BytesIO
-from app.helpers import get_schedule
+
 from app.config import settings
 fit = settings.FIT
 
@@ -28,10 +29,6 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 
-
-from zoneinfo import ZoneInfo
-from fastapi.templating import Jinja2Templates
-
 SMTP_SERVER = "smtp.mail.ru"
 SMTP_PORT = 25
 SMTP_USER = "example@mail.ru"
@@ -41,30 +38,12 @@ SMTP_PASSWORD = "password"
 templates = Jinja2Templates(directory="app/templates")
 
 
-
-# Регистрируем фильтр локального времени Владивостока
-def format_vladivostok_time(dt_utc):
-    if not dt_utc:
-        return ""
-    if dt_utc.tzinfo is None:
-        dt_utc = dt_utc.replace(tzinfo=ZoneInfo("UTC"))
-    local_dt = dt_utc.astimezone(ZoneInfo("Asia/Vladivostok"))
-    return local_dt.strftime("%d.%m.%Y %H:%M")
-
-def parse_datetime(dt_str: str) -> datetime | None:
-    if not dt_str:
-        return None
-    try:
-        return datetime.strptime(dt_str, "%Y-%m-%dT%H:%M")
-    except ValueError:
-        return None
-
-
 templates.env.filters["vlad_time"] = format_vladivostok_time
 
 app = FastAPI(title="CargoFlow API")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
 app.include_router(voyages_router)
+app.include_router(containers_router)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -78,6 +57,10 @@ async def home(request: Request, db: AsyncSession = Depends(get_db)):
         )
     except HTTPException:
         return RedirectResponse(url="/login")
+
+@app.get('/favicon.ico', include_in_schema=False)
+async def favicon():
+    return FileResponse('favicon.svg')
 
 @app.on_event("startup")
 async def startup():
@@ -1488,11 +1471,15 @@ async def manage_order(order_id: int, request: Request, db: AsyncSession = Depen
         .options(
             joinedload(CargoOrder.port_of_loading),
             joinedload(CargoOrder.port_of_discharge),
-            selectinload(CargoOrder.containers).joinedload(Container.equipment)
+            joinedload(CargoOrder.pre_carriage_carrier),
+            selectinload(CargoOrder.containers).options(joinedload(Container.equipment))
         )
         .where(CargoOrder.id == order_id)
     )
     order = result.scalars().first()
+    
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ не найден.")
     
     return templates.TemplateResponse(
         request=request,

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, FastAPI, Depends, HTTPException, status, Request, Response, Form, BackgroundTasks, Query
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm 
-from app.helpers import validate_container_number
+from app.helpers import validate_container_number, get_schedule, format_vladivostok_time, parse_datetime
 from app.db import engine, Base, get_db, dadatoken
 from sqlalchemy import select, delete , update, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,35 +16,19 @@ from datetime import datetime, date, timedelta
 import httpx, html, json
 from xhtml2pdf import pisa
 from io import BytesIO
-from app.helpers import get_schedule
 from app.config import settings
 fit = settings.FIT
-from zoneinfo import ZoneInfo
-from fastapi.templating import Jinja2Templates
+
+
 
 templates = Jinja2Templates(directory="app/templates")
 
-# Регистрируем фильтр локального времени Владивостока
-def format_vladivostok_time(dt_utc):
-    if not dt_utc:
-        return ""
-    if dt_utc.tzinfo is None:
-        dt_utc = dt_utc.replace(tzinfo=ZoneInfo("UTC"))
-    local_dt = dt_utc.astimezone(ZoneInfo("Asia/Vladivostok"))
-    return local_dt.strftime("%d.%m.%Y %H:%M")
-
-def parse_datetime(dt_str: str) -> datetime | None:
-    if not dt_str:
-        return None
-    try:
-        return datetime.strptime(dt_str, "%Y-%m-%dT%H:%M")
-    except ValueError:
-        return None
 
 
 templates.env.filters["vlad_time"] = format_vladivostok_time
 
 router = APIRouter(prefix="/voyages", redirect_slashes=False, tags=["Operator Voyages"])
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
 
 @router.get("/", response_class=HTMLResponse)
@@ -108,7 +92,7 @@ async def get_schedule_modal(request: Request, db: AsyncSession = Depends(get_db
     return templates.TemplateResponse(
         name="voyages/schedule_modal.html",
         request=request,
-        context={"ports": ports}
+        context={"ports": ports, "today":date.today().isoformat()}
     )
 
 @router.post("/import-schedule")

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Верхняя грань куба (Яркий оранжевый) -->
+  <path d="M16 4 L28 11 L16 18 L4 11 Z" fill="#FF6B00"/>
+  
+  <!-- Левая грань (Глубокий графит логистики) -->
+  <path d="M4 11 L16 18 L16 28 L4 21 Z" fill="#1E293B"/>
+  
+  <!-- Правая грань в виде динамичной стрелки вперед (Неоновый голубой flow) -->
+  <path d="M16 18 L28 11 L28 21 L16 28 Z" fill="#00E5FF"/>
+  
+  <!-- Внутренние линии рифления для ассоциации с контейнером -->
+  <path d="M8 15 L8 23" stroke="#000000" stroke-width="1.5" opacity="0.15" stroke-linecap="round"/>
+  <path d="M12 17 L12 25" stroke="#000000" stroke-width="1.5" opacity="0.15" stroke-linecap="round"/>
+</svg>

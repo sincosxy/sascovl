@@ -33,7 +33,7 @@
                     hx-include="[name='pol_id'], [name='pod_id'], [name='order_id']"
                     #}
                     class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2 bg-white">
-                    <option value="" disabled {% if not order.pol_id %}selected{% endif %}>Выберите порт...</option>
+                    <!--option value="" disabled {% if not order.pol_id %}selected{% endif %}>Выберите порт...</option-->
                     {% for port in ports %}
                     <option value="{{ port.id }}" {% if order and order.pol_id == port.id %}selected{% elif not order and loop.first %}selected{% endif %}>{{ port.name }} ({{ port.code }})</option>
                     {% endfor %}
