@@ -19,12 +19,13 @@
 
     {# --- КНОПКА ДОБАВЛЕНИЯ НОВОГО СУДНА --- #}
     <div style="padding: 10px 12px; cursor: pointer; background: #f7fafc; color: #3182ce; font-weight: bold; border-top: 1px solid #e2e8f0;"
-         hx-get="/voyages/vessels/new"
-         hx-target="#vessel-modal-container"
-         hx-swap="innerHTML"
-         hx-include="#vessel_display_name"
-         @mousedown="document.getElementById('vessel-results-container').style.display = 'none';">
-        ➕ Добавить новое судно {% if request.query_params.get('q') %} "{{ request.query_params.get('q') }}" {% endif %}
+        hx-get="/voyages/vessels/new"
+        hx-target="#vessel-modal-container"
+        hx-swap="innerHTML"
+        hx-include="#vessel_display_name"
+        @mousedown="$event.preventDefault()"
+        hx-on::after-request="document.getElementById('vessel-results-container').style.display = 'none';">
+        ➕ Добавить новое судно {% if search_query %} "{{ search_query }}" {% endif %}
     </div>
 </div>
 

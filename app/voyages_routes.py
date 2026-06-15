@@ -241,7 +241,7 @@ async def search_vessels(request: Request, db: AsyncSession = Depends(get_db)):
         return templates.TemplateResponse(
             name="voyages/vessel_search_results.html",
             request=request,
-            context={"vessels": vessels, "is_history": True}
+            context={"vessels": vessels, "is_history": True, "search_query": search_query}
         )
     
     # Сценарий Б: Оператор вводит текст — ищем по подстроке
@@ -256,7 +256,7 @@ async def search_vessels(request: Request, db: AsyncSession = Depends(get_db)):
     return templates.TemplateResponse(
         name="voyages/vessel_search_results.html", 
         request=request,
-        context={"vessels": vessels, "is_history": False}
+        context={"vessels": vessels, "is_history": False, "search_query": search_query}
     )
 
 @router.post("/", response_class=HTMLResponse)
@@ -320,7 +320,7 @@ async def create_voyage(
 
 
 @router.get("/vessels/new", response_class=HTMLResponse)
-async def new_vessel_form(request: Request, q: str = Query(default="")):
+async def new_vessel_form(request: Request, q: str = Query(default="", alias="vessel_display_name")):
     """Открывает мини-модалку добавления судна, предзаполняя название."""
     return templates.TemplateResponse(
         name="voyages/vessel_form.html",
