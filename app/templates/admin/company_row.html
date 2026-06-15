@@ -6,7 +6,7 @@
     </td>
     <td class="py-3 px-2 text-right space-x-3">
         <!-- Кнопка Правки -->
-        <button hx-get="/api/admin/edit-company/{{ company.id }}" 
+        <button hx-get="/admin/edit-company/{{ company.id }}" 
                 hx-target="#admin-modal-content"
                 onclick="document.getElementById('admin-modal').classList.remove('hidden')"
                 class="text-blue-600 hover:underline text-sm font-semibold">
@@ -14,7 +14,7 @@
         </button>
 
         <!-- Кнопка Удаления -->
-        <button hx-delete="/api/admin/delete-company/{{ company.id }}"
+        <button hx-delete="/admin/delete-company/{{ company.id }}"
                 hx-confirm="Вы уверены, что хотите удалить компанию {{ company.name }}?"
                 hx-target="#company-{{ company.id }}"
                 hx-swap="outerHTML"

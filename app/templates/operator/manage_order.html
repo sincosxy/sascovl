@@ -11,7 +11,7 @@
 </style>
 <div class="max-w-5xl mx-auto space-y-6">
     <div class="flex items-center justify-between bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-        <button hx-get="/api/operator/dashboard" hx-target="#main-content" class="text-blue-600 hover:underline">
+        <button hx-get="/admin/dashboard" hx-target="#main-content" class="text-blue-600 hover:underline">
             ← Назад к списку
         </button>
         <div class="text-right">
@@ -117,7 +117,7 @@
         {% if order.pre_carriage_required == False and order.pre_carriage_carrier %}
         <div class="bg-orange-50 border-2 border-orange-200 p-4 rounded-xl">
             <h3 class="font-bold text-orange-800 mb-2 italic">⚠️ Требуется разнарядка для своего вывоза</h3>
-            <p class="text-sm">Клиент заберет порожний своей машиной. Перевозчик: <span class="font-black underline">{{ order.pre_carriage_carrier }}</span></p>
+            <p class="text-sm">Клиент заберет порожний своей машиной. Перевозчик: <span class="font-black underline">{{ order.pre_carriage_carrier.name }}</span></p>
             <p class="text-xs mt-2 text-orange-600">После ввода ПИН-кода выше, клиент увидит его в своем кабинете.</p>
         </div>
         {% endif %}

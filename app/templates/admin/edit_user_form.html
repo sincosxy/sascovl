@@ -3,7 +3,7 @@
         {{ 'Редактирование пользователя' if user else 'Новый пользователь' }}
     </h2>
 
-    <form hx-post="{{ '/api/admin/update-user-form/' + (user.id|string) if user else '/api/admin/create-user' }}" 
+    <form hx-post="{{ '/admin/update-user-form/' + (user.id|string) if user else '/admin/create-user' }}" 
           hx-target="{{ '#user-' + (user.id|string) if user else '#users-list' }}" 
           hx-swap="{{ 'outerHTML' if user else 'afterbegin' }}" 
           class="space-y-4">

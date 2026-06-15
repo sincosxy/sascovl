@@ -3,7 +3,7 @@
         {{ 'Редактирование' if company else 'Новая компания' }}
     </h2>
 
-    <form hx-post="{{ '/api/admin/update-company/' + (company.id|string) if company else '/api/admin/create-company' }}" 
+    <form hx-post="{{ '/admin/update-company/' + (company.id|string) if company else '/admin/create-company' }}" 
           hx-target="{{ '#company-' + (company.id|string) if company else '#companies-list' }}" 
           hx-swap="{{ 'outerHTML' if company else 'afterbegin' }}" 
           class="space-y-6">
@@ -15,7 +15,7 @@
                 <label class="block text-xs text-gray-500 mb-1">Название (Поиск DaData)</label>
                 <input type="text" name="name" 
                     value="{{ company.name or '' }}" required autocomplete="off"
-                    hx-get="/api/admin/search-company-dadata" 
+                    hx-get="/admin/search-company-dadata" 
                     hx-trigger="keyup changed delay:500ms" 
                     hx-target="next .results-container"
                     hx-swap="innerHTML"

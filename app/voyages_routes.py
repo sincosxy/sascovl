@@ -1,7 +1,7 @@
 from fastapi import APIRouter, FastAPI, Depends, HTTPException, status, Request, Response, Form, BackgroundTasks, Query
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm 
-from app.helpers import validate_container_number, get_schedule, format_vladivostok_time, parse_datetime
+from app.helpers import validate_container_number, get_schedule, format_vladivostok_time, parse_datetime, verify_auth_cookie  
 from app.db import engine, Base, get_db, dadatoken
 from sqlalchemy import select, delete , update, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,7 +27,7 @@ templates = Jinja2Templates(directory="app/templates")
 
 templates.env.filters["vlad_time"] = format_vladivostok_time
 
-router = APIRouter(prefix="/voyages", redirect_slashes=False, tags=["Operator Voyages"])
+router = APIRouter(prefix="/voyages", dependencies=[Depends(verify_auth_cookie)], redirect_slashes=False, tags=["Operator Voyages"])
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
 

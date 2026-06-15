@@ -13,12 +13,12 @@
         {{ user.company.name if user.company else '—' }}
     </td>
     <td class="py-3 px-2 text-right space-x-2">
-        <button hx-get="/api/admin/edit-user-form/{{ user.id }}" 
+        <button hx-get="/admin/edit-user-form/{{ user.id }}" 
                 hx-target="#admin-modal-content"
                 onclick="document.getElementById('admin-modal').classList.remove('hidden')"
                 class="text-blue-600 hover:underline text-sm font-semibold">Правка</button>
         
-        <button hx-delete="/api/admin/delete-user/{{ user.id }}"
+        <button hx-delete="/admin/delete-user/{{ user.id }}"
                 hx-confirm="Удалить доступ для {{ user.email }}?"
                 hx-target="#user-{{ user.id }}"
                 hx-swap="outerHTML"

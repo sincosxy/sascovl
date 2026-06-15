@@ -1,7 +1,7 @@
 from fastapi import APIRouter, FastAPI, Depends, HTTPException, status, Request, Response, Form, BackgroundTasks, Query
 from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm 
-from app.helpers import validate_container_number, get_schedule, format_vladivostok_time, parse_datetime
+from app.helpers import validate_container_number, get_schedule, format_vladivostok_time, parse_datetime, verify_auth_cookie  
 from app.db import engine, Base, get_db, dadatoken
 from sqlalchemy import select, delete , update, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +20,7 @@ fit = settings.FIT
 
 router = APIRouter(
     prefix="/containers",
+    dependencies=[Depends(verify_auth_cookie)],
     tags=["containers"]
 )
 templates = Jinja2Templates(directory="app/templates")
