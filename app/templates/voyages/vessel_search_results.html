@@ -11,9 +11,9 @@
     {% for vessel in vessels %}
     <div style="padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #edf2f7;"
          class="hover-bg-blue"
-         @mousedown="selectVessel('{{ vessel.id }}', '{{ vessel.name }} ({{ vessel.name_eng }})')">
+         @mousedown="selectVessel('{{ vessel.id }}', '{{ vessel.name }}')"> <!--" ({{ vessel.name_eng }})')"-->
         <strong>{{ vessel.name }}</strong> 
-        <span style="color: #718096; font-size: 13px;">({{ vessel.name_eng }})</span>
+        <!--span style="color: #718096; font-size: 13px;">({{ vessel.name_eng }})</span-->
     </div>
     {% endfor %}
 
