@@ -1,7 +1,7 @@
 from fastapi import APIRouter, FastAPI, Depends, HTTPException, status, Request, Response, Form, BackgroundTasks, Query
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm 
-from app.helpers import validate_container_number, get_schedule, format_vladivostok_time, parse_datetime, verify_auth_cookie  
+from app.helpers import validate_container_number, get_schedule, format_vladivostok_time, parse_datetime, verify_auth_cookie, render_demands_table, get_vmtp_demands
 from app.db import engine, Base, get_db, dadatoken
 from sqlalchemy import select, delete , update, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -303,3 +303,57 @@ async def create_company(
     response = HTMLResponse(content="")
     response.headers["HX-Trigger"] = "closeModal"
     return response
+
+@router.get("/demands")
+async def check_demands(
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        current_user = await get_current_user(request, db)
+        
+        # Проверка прав: если не админ и не оператор — на выход
+        if current_user.role not in [UserRole.ADMIN, UserRole.OPERATOR]:
+            #return RedirectResponse(url="/", status_code=303)
+            return Response(headers={"HX-Redirect": "/"})
+
+        return templates.TemplateResponse(
+            request=request,
+            name="/admin/check_demands.html", # Лучше держать в папке operator, чтобы не путать с клиентским
+            context={"user": current_user}
+        )
+    except HTTPException:
+        response = RedirectResponse(url="/login", status_code=303)
+        response.headers["HX-Redirect"] = "/login" # Заставит HTMX сделать полный редирект
+        return response
+    
+@router.post("/check_demands", response_class=HTMLResponse)
+async def check_demands(
+    request: Request,
+    container_number: str = Form(...),
+    user: User = Depends(get_current_user)
+):
+    container = container_number.strip().upper().replace("-", "").replace(" ", "")
+    
+    # 1. Валидация
+    if not validate_container_number(container):
+        return HTMLResponse(
+            content=f"""
+            <div class="p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-50 border border-red-200">
+                <span class="font-medium">Ошибка валидации:</span> Номер контейнера <strong>"{container_number}"</strong> некорректен.
+            </div>
+            """
+        )
+        
+    # 2. Запрос к ВМТП
+    vmtp_data = get_vmtp_demands(container)
+    
+    if "error" in vmtp_data:
+        return HTMLResponse(
+            content=f'<div class="p-4 text-sm text-red-800 bg-red-50 rounded-lg">{vmtp_data["error"]}</div>'
+        )
+
+    # 3. Рендеринг ответа одной строкой!
+    html_response = render_demands_table(vmtp_data, container)
+    
+    return HTMLResponse(content=html_response)

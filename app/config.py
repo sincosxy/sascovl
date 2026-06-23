@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     DADA: str
     FIT: str
+    VMTP_USER: str
+    VMTP_PASSWORD: str
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod

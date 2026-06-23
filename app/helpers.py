@@ -1,7 +1,9 @@
-import requests, json
-from datetime import datetime
+import requests, json, time
+from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo
+from typing import Dict, Optional
 from fastapi import Request, HTTPException, status
+from app.config import settings
 
 
 def validate_container_number(number: str) -> bool:
@@ -128,3 +130,226 @@ async def verify_auth_cookie(request: Request):
     
     # Здесь может быть логика проверки токена в БД/Redis
     return access_token
+
+
+class TokenManager:
+    def __init__(self, username: str, password: str):
+        self.username = username
+        self.password = password
+        self.token_data: Optional[Dict] = None
+        self.last_refresh_time: float = 0
+        self.refresh_interval: int = 600  # 10 минут
+
+    def _get_new_token(self) -> Optional[Dict]:
+        """Запрашивает новый токен у внешнего API ВМТП"""
+        token_url = f'https://pp.vmtp.ru/api/token?username={self.username}&password={self.password}'
+
+        headers = {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+        }
+        try:
+            response = requests.post(
+                token_url, 
+                headers=headers, 
+                timeout=10,
+                verify=False # Игнорируем проблему с сертификатами Минцифры
+            )
+            if response.status_code == 200:
+                token_data = response.json()
+                return {
+                    'access_token': token_data['access_token'],
+                    'expires': time.time() + 600
+                }
+            
+            print(f"[VMTP AUTH ERROR] Код: {response.status_code}, Ответ: {response.text}")
+            return None
+            
+        except requests.RequestException as e:
+            print(f"[VMTP CONNECTION ERROR] Исключение: {e}")
+            return None
+
+    def _is_token_valid(self) -> bool:
+        if not self.token_data:
+            return False
+        return time.time() < self.token_data['expires']
+
+    def _refresh_if_needed(self):
+        current_time = time.time()
+        # Если токена нет или он просрочен
+        if not self._is_token_valid():
+            self.token_data = self._get_new_token()
+            self.last_refresh_time = current_time
+        # Либо если подошел интервал обновления
+        elif current_time - self.last_refresh_time > self.refresh_interval:
+            self.token_data = self._get_new_token()
+            self.last_refresh_time = current_time
+
+    def get_valid_token(self) -> Optional[str]:
+        """Возвращает строку токена или None в случае ошибки"""
+        self._refresh_if_needed()
+        if self.token_data:
+            return self.token_data['access_token']
+        return None
+
+
+# Инициализируем один глобальный менеджер токенов для всего приложения
+token_manager = TokenManager(username=settings.VMTP_USER, password=settings.VMTP_PASSWORD)
+
+def get_vmtp_demands(container: str) -> Optional[Dict]:
+    """Запрашивает требования таможни по номеру контейнера за последние 30 дней"""
+    token = token_manager.get_valid_token()
+    if not token:
+        return {"error": "Не удалось авторизоваться во внешней системе ВМТП"}
+
+    current_date = date.today().strftime('%Y-%m-%d')
+    past_date = (date.today() - timedelta(days=30)).strftime('%Y-%m-%d')
+
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'
+    }
+    
+    # offset выставил в 0, чтобы искать с самого начала списка, query — наш контейнер
+    params = {
+        'date-from': past_date, 
+        'date-to': current_date, 
+        'offset': '20', 
+        'query': container
+    }
+    
+    try:
+        url = 'https://pp.vmtp.ru/api/remote/erp/api/v2/customs-requirements'
+        response = requests.get(url, params=params, headers=headers, timeout=15)
+        
+        if response.status_code == 200:
+            return response.json()
+        return {"error": f"Ошибка ВМТП: API вернул статус {response.status_code}"}
+    except requests.RequestException as e:
+        return {"error": f"Ошибка подключения к сервису ВМТП: {str(e)}"}
+
+
+def format_vmtp_date(raw_date_str: str) -> str:
+    """
+    Железобетонный парсер дат для ВМТП.
+    Превращает 2026-06-23T09:35:43 в "23.06.2026 в 09:35"
+    а 2026-06-24T00:00:00 в "24.06.2026"
+    """
+    if not raw_date_str:
+        return '—'
+        
+    date_str = str(raw_date_str).strip()
+    
+    # 1. Если пришли пустые нули времени, сразу срезаем их до чистой даты YYYY-MM-DD
+    if 'T00:00' in date_str or ' 00:00' in date_str:
+        date_str = date_str.split('T')[0].split(' ')[0]
+        
+    try:
+        # 2. Если в строке осталось реальное время (например, T09:35:43)
+        if 'T' in date_str:
+            # Берём только YYYY-MM-DDTHH:MM:SS (первые 19 символов), отрезая милисекунды и Z
+            clean_iso = date_str.replace('Z', '')[:19]
+            dt = datetime.datetime.fromisoformat(clean_iso)
+            return dt.strftime('%d.%m.%Y в %H:%M')
+            
+        # 3. Если это чистая дата без времени (YYYY-MM-DD)
+        else:
+            clean_date = date_str[:10] 
+            dt = datetime.datetime.strptime(clean_date, '%Y-%m-%d')
+            return dt.strftime('%d.%m.%Y')
+            
+    except Exception:
+        # Страховка: если парсинг не удался, возвращаем строку как есть
+        return date_str
+
+def render_demands_table(vmtp_data: dict, container: str) -> str:
+    """Генерирует готовый HTML-код таблицы результатов для HTMX"""
+    
+    # 1. Извлекаем список из правильного ключа ВМТП
+    records = []
+    if isinstance(vmtp_data, dict):
+        data_block = vmtp_data.get('data', {})
+        if isinstance(data_block, dict):
+            records = data_block.get('customsRequirements', [])
+
+    # 2. Если требований нет
+    if not records:
+        return f"""
+        <div class="p-4 mb-4 text-sm text-amber-800 rounded-lg bg-amber-50 border border-amber-200">
+            Требования по контейнеру <strong>{container}</strong> за последние 30 дней не найдены.
+        </div>
+        """
+        
+    # 3. Начинаем сборку таблицы
+    html_content = f"""
+    <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Результаты из ВМТП для {container}</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left text-gray-500">
+                <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3">Коносамент (B/L)</th>
+                        <th class="px-4 py-3">Тип</th>
+                        <th class="px-4 py-3">Детали досмотра</th>
+                        <th class="px-4 py-3">Статус</th>
+                    </tr>
+                </thead>
+                <tbody>
+    """
+    
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+            
+        status = record.get('status', 'Получено')
+        bill_of_lading = record.get('billOfLanding', record.get('billOfLading', '—'))
+        
+        screening_type = record.get('screeningType')
+        screening_type_display = screening_type if screening_type else '—'
+        
+        # --- 4. ПАРСИНГ ДАТ ПО НОВЫМ ПРАВИЛАМ ---
+        
+        # Дата издания требования (строго поле 'date' из корня объекта требования)
+        formatted_issue_date = format_vmtp_date(record.get('date'))
+        
+        # Дата досмотра (поле 'screeningDate')
+        formatted_screen_date = format_vmtp_date(record.get('screeningDate'))
+
+        # --- 5. ОБРАБОТКА ПРОЦЕНТА ВЫЕМКИ ---
+        screening_deep = record.get('screeningDeep')
+        if screening_deep in [None, '', 0, '0', 0.0, '0%']:
+            deep_display = "без выемки"
+        else:
+            deep_display = f"{screening_deep}%" if '%' not in str(screening_deep) else str(screening_deep)
+
+        # Сборка блока деталей с новыми датами
+        screening_info = f"""
+        <div class="space-y-0.5 text-xs text-gray-600">
+            <div><span class="text-gray-400">Издано:</span> <span class="font-medium text-gray-700">{formatted_issue_date}</span></div>
+            <div><span class="text-gray-400">Досмотр:</span> {formatted_screen_date}</div>
+            <div><span class="text-gray-400">Выемка:</span> <span class="font-medium text-gray-700">{deep_display}</span></div>
+        </div>
+        """
+        
+        html_content += f"""
+                    <tr class="bg-white border-b border-gray-100 hover:bg-gray-50 transition align-top">
+                        <td class="px-4 py-3 font-mono text-gray-900 font-medium">{bill_of_lading}</td>
+                        <td class="px-4 py-3 text-gray-700 font-medium">{screening_type_display}</td>
+                        <td class="px-4 py-3">{screening_info}</td>
+                        <td class="px-4 py-3">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-800">
+                                {status}
+                            </span>
+                        </td>
+                    </tr>
+        """
+        
+    html_content += """
+                </tbody>
+            </table>
+        </div>
+    </div>
+    """
+    
+    return html_content

@@ -91,6 +91,7 @@ async def login_page(request: Request):
 
 @app.post("/api/login")
 async def login_browser(
+    request: Request,
     response: Response, 
     form_data: OAuth2PasswordRequestForm = Depends(), 
     db: AsyncSession = Depends(get_db)
@@ -98,16 +99,27 @@ async def login_browser(
     result = await db.execute(select(User).filter(User.email == form_data.username))
     user = result.scalars().first()
 
+    is_htmx = request.headers.get("HX-Request") == "true"
+
     if not user or not verify_password(form_data.password, user.hashed_password):
+        if  is_htmx:
         #raise HTTPException(status_code=401, detail="Error")
-        return HTMLResponse(
-            content="Неверный email или пароль", 
-            status_code=200 # Важно оставить 200, чтобы HTMX обработал ответ
-        )
+            return HTMLResponse(
+                content="Неверный email или пароль", 
+                status_code=200 # Важно оставить 200, чтобы HTMX обработал ответ
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Неверный email или пароль"
+            )
     
     token = create_access_token(data={"sub": user.email, "role": user.role.value})
-    res = Response()
-    res.headers["HX-Redirect"] = "/" # Это заставит браузер перейти на главную
+    if is_htmx:
+        res = Response()
+        res.headers["HX-Redirect"] = "/" # Это заставит браузер перейти на главную
+    else:
+        res = JSONResponse(content={"access_token": token, "token_type": "bearer"})
     res.set_cookie(key="access_token", value=token, httponly=True)
     return res
 

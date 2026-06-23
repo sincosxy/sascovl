@@ -56,6 +56,79 @@ async def list_containers(
     return templates.TemplateResponse(name="containers/containers_page.html", request=request, context={})
 
 
+@router.get("/{container_id}/edit", response_class=HTMLResponse)
+async def edit_container_form(
+    container_id: int, 
+    request: Request, 
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user) # Защита, если нужна
+):
+    # Достаем контейнер из базы
+    result = await db.execute(select(Container).where(Container.id == container_id))
+    container = result.scalars().first()
+    
+    if not container:
+        return HTMLResponse("Контейнер не найден", status_code=404)
+
+    # Рендерим модалку и передаем туда объект контейнера для предзаполнения полей
+    return templates.TemplateResponse(
+        name="containers/container_edit_modal.html",
+        request=request,
+        context={"container": container}
+    )
+
+@router.post("/{container_id}/edit", response_class=HTMLResponse)
+async def update_container(
+    container_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user) # Ваша защита ролей
+):
+    # Достаем контейнер
+    result = await db.execute(select(Container).where(Container.id == container_id))
+    container = result.scalars().first()
+    if not container:
+        raise HTTPException(status_code=404, detail="Контейнер не найден")
+
+    # Читаем данные из формы
+    form = await request.form()
+    
+    # Обновляем поля модели
+    container.container_number = form.get("container_number", "").strip()
+    container.weight_gross = int(float(form.get("weight_gross") or 0))
+    container.pieces = int(float(form.get("pieces") or 0))
+    container.seal = form.get("seal", "").strip() or None
+    container.pin_code = form.get("pin_code", "").strip() or None
+    container.cargo_description = form.get("cargo_description", "").strip() or None
+    
+    # Сюда можно добавить вашу функцию валидации номера, если она есть
+    # container.valid_number = validate_container_number(container.container_number)
+
+    await db.commit()
+    await db.refresh(container) # Чтобы подтянулись связанные объекты (например, order)
+    query = (
+        select(Container)
+            .options(
+                joinedload(Container.equipment),
+                joinedload(Container.order)
+                    .joinedload(CargoOrder.owner)
+                    .joinedload(User.company)
+            )
+            .where(Container.id == container_id)
+    )
+    result = await db.execute(query)
+    container = result.scalars().first()
+    # Рендерим обратно ИМЕННО ОДНУ СТРОКУ таблицы с новыми данными
+    response = templates.TemplateResponse(
+        name="containers/container_row.html",  # Вынесите верстку <tr> в отдельный файлик строки
+        request=request,
+        context={"container": container}
+    )
+    
+    # Вешаем триггер на закрытие модалки
+    response.headers["HX-Trigger"] = "closeModal" 
+    return response
+
 @router.post("/{container_id}/cancel", response_class=HTMLResponse)
 async def cancel_container(
     request: Request,

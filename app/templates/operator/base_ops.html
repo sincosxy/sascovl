@@ -31,12 +31,15 @@
                         <button hx-get="/admin/" hx-target="#main-content" class="hover:text-blue-400 transition">Контрагенты</button>
                         <button hx-get="/voyages/" hx-target="#main-content" class="hover:text-blue-400 transition">Рейсы</button>
                         <button hx-get="/containers/" hx-target="#main-content" class="hover:text-blue-400 transition">Контейнеры</button>
+                        {% if user.role.value == 'admin' %}
+                            <button hx-get="/admin/demands/" hx-target="#main-content" class="hover:text-blue-400 transition">Требования ВМТП</button>
+                        {% endif %}
                     </div>
                 </div>
                 <div class="flex items-center gap-4">
                     <div class="text-right hidden md:block">
                         <div class="text-xs text-gray-400">Оператор</div>
-                        <div class="text-sm font-bold">{{ user.username }}</div>
+                        <div class="text-sm font-bold">{{ user.name }}</div>
                     </div>
                     <button hx-post="/api/logout" hx-target="body" class="bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white px-3 py-1.5 rounded transition text-xs font-bold border border-red-500/50">
                         Выход

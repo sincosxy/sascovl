@@ -1,6 +1,15 @@
 <tr id="container-row-{{ container.id }}" class="{% if container.is_cancelled %}bg-red-50 opacity-60{% endif %} transition-all">
+    <!--td class="px-4 py-2 border-b font-mono {% if container.valid_number == False %}text-red-600 font-bold{% endif %}">
+        {{ container.container_number or '---не присвоен---' }}
+    </td-->
     <td class="px-4 py-2 border-b font-mono {% if container.valid_number == False %}text-red-600 font-bold{% endif %}">
-        {{ container.container_number or '---' }}
+        <button type="button"
+                hx-get="/containers/{{ container.id }}/edit"
+                hx-target="#vessel-modal-container" 
+                hx-swap="innerHTML"
+                class="hover:text-blue-600 hover:underline cursor-pointer text-left font-mono focus:outline-hidden bg-transparent border-0 p-0 m-0">
+            {{ container.container_number or '-не присвоен-' }}
+        </button>
     </td>
     <td class="px-6 py-4 border-b">
         {% if container.order %}
@@ -23,10 +32,11 @@
         <span class="badge">{{ container.equipment.name if container.equipment else container.equipment_id }}</span>
     </td>
     <td class="px-4 py-2 border-b">
-        <div class="text-xs">
+        <!--div class="text-xs">
             <div>SOC: {{ '✅' if container.is_soc else '❌' }}</div>
             <div>LCL: {{ '✅' if container.is_lcl else '❌' }}</div>
-        </div>
+        <div-->
+        <div> {{ 'SOC' if container.is_soc else 'COC' }} </div>
     </td>
     <td class="px-4 py-2 border-b">
         <div>{{ container.weight_gross or 0 }} кг</div>
