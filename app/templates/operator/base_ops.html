@@ -32,7 +32,7 @@
                         <button hx-get="/voyages/" hx-target="#main-content" class="hover:text-blue-400 transition">Рейсы</button>
                         <button hx-get="/containers/" hx-target="#main-content" class="hover:text-blue-400 transition">Контейнеры</button>
                         {% if user.role.value == 'admin' %}
-                            <button hx-get="/admin/demands/" hx-target="#main-content" class="hover:text-blue-400 transition">Требования ВМТП</button>
+                            <button hx-get="/admin/demands" hx-target="#main-content" class="hover:text-blue-400 transition">Требования ВМТП</button>
                         {% endif %}
                     </div>
                 </div>
