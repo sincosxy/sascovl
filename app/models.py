@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Enum, ForeignKey, Float, Boolean, Date, DateTime
+from sqlalchemy import Column, Integer, String, Enum, ForeignKey, Float, Boolean, Date, DateTime, Index, Text
 from sqlalchemy.orm import relationship
 from app.db import Base
 import enum
@@ -228,3 +228,31 @@ class GeneralCargoItem(Base):
     order = relationship("CargoOrder", back_populates="items")
 
 #User.orders = relationship("CargoOrder", back_populates="owner")
+
+class ProcessedFile(Base):
+    """Таблица для контроля уже скачанных и обработанных файлов."""
+    __tablename__ = "processed_files"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    file_name = Column(String, unique=True, nullable=False)
+    processed_at = Column(DateTime, server_default=func.now())
+
+class ContainerArchive(Base):
+    """Таблица-архив для хранения всех найденных контейнеров, контекста и дат."""
+    __tablename__ = "containers_archive"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    container_number = Column(String(11), nullable=False)
+    file_name = Column(String, nullable=False)
+    page_number = Column(Integer, nullable=False)
+    raw_row_text = Column(Text, nullable=True)
+    is_valid_iso = Column(Boolean, default=True, nullable=False)
+    document_date = Column(Date, nullable=True) 
+    
+    # Используем server_default=func.now() для автоматического штампа времени базой данных
+    created_at = Column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        Index('idx_containers_number', 'container_number'),
+        Index('idx_document_date', 'document_date'),
+    )

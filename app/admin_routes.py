@@ -6,7 +6,7 @@ from app.db import engine, Base, get_db, dadatoken
 from sqlalchemy import select, delete , update, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
-from app.models import User, Counterparty, CargoOrder, UserRole, Port, TransportType, Equipment, Container, Company, CargoItem, Voyage, Vessel
+from app.models import User, Counterparty, CargoOrder, UserRole, Port, TransportType, Equipment, Container, Company, CargoItem, Voyage, Vessel, ContainerArchive 
 from app.auth import verify_password, create_access_token, get_current_user, hash_password 
 from app.schemas import Token, UserLogin, CounterpartyCreate, CounterpartyRead, OrderRead, UserCreate
 from fastapi.templating import Jinja2Templates
@@ -331,7 +331,8 @@ async def check_demands(
 async def check_demands(
     request: Request,
     container_number: str = Form(...),
-    user: User = Depends(get_current_user)
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     container = container_number.strip().upper().replace("-", "").replace(" ", "")
     
@@ -344,16 +345,67 @@ async def check_demands(
             </div>
             """
         )
-        
+    
+    stmt = (
+        select(ContainerArchive)
+        .filter(ContainerArchive.container_number == container)
+        .order_by(ContainerArchive.document_date.desc())
+    )
+    result = await db.execute(stmt)
+    archive_records = result.scalars().all()
+
     # 2. Запрос к ВМТП
     vmtp_data = get_vmtp_demands(container)
     
-    if "error" in vmtp_data:
-        return HTMLResponse(
-            content=f'<div class="p-4 text-sm text-red-800 bg-red-50 rounded-lg">{vmtp_data["error"]}</div>'
-        )
 
-    # 3. Рендеринг ответа одной строкой!
-    html_response = render_demands_table(vmtp_data, container)
+    archive_html = ""
+    if archive_records:
+        archive_html = f"""
+        <div class="mt-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-3">Требования таможни по терминалу ВМРП</h3>
+            <div class="overflow-x-auto border border-gray-200 rounded-lg">
+                <table class="min-w-full divide-y divide-gray-200 text-sm text-left">
+                    <thead class="bg-gray-50 text-gray-700 uppercase text-xs font-medium">
+                        <tr>
+                            <th class="px-4 py-3">Дата дока</th>
+                            <th class="px-4 py-3">Имя файла</th>
+                            <th class="px-4 py-3">Стр.</th>
+                            <th class="px-4 py-3">Контекст строки</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 bg-white text-gray-900">
+        """
+        for rec in archive_records:
+            doc_date = rec.document_date.strftime('%d.%m.%Y') if rec.document_date else "Не указана"
+            archive_html += f"""
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 font-medium whitespace-nowrap">{doc_date}</td>
+                            <td class="px-4 py-3 text-blue-600 font-mono break-all">{rec.file_name}</td>
+                            <td class="px-4 py-3">{rec.page_number}</td>
+                            <td class="px-4 py-3 text-gray-600 italic font-mono">{rec.raw_row_text}</td>
+                        </tr>
+            """
+        archive_html += "</tbody></table></div></div>"
+    else:
+        archive_html = """
+        <h3 class="text-lg font-semibold text-gray-900 mb-3">Требования таможни по терминалу ВМРП</h3>
+        <div class="mt-6 p-4 text-sm text-gray-500 bg-gray-50 rounded-lg border border-gray-100">
+            ℹ️ В архиве PDF-документов от ВМРП упоминаний этого контейнера не найдено.
+        </div>
+        """
+
+    # 5. Обработка ответа от ВМТП и склейка результатов
+    if "error" in vmtp_data:
+        vmtp_html = f'<div class="p-4 text-sm text-red-800 bg-red-50 rounded-lg">{vmtp_data["error"]}</div>'
+    else:
+        vmtp_html = render_demands_table(vmtp_data, container)
     
-    return HTMLResponse(content=html_response)
+    # Склеиваем ответ от ВМТП и данные из нашего локального архива в один HTML
+    combined_response = f"""
+        <div class="space-y-4">
+            {vmtp_html}
+            {archive_html}
+        </div>
+    """
+    
+    return HTMLResponse(content=combined_response)

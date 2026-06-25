@@ -276,6 +276,7 @@ def render_demands_table(vmtp_data: dict, container: str) -> str:
     # 2. Если требований нет
     if not records:
         return f"""
+        <h3 class="text-lg font-semibold text-gray-900 mb-3">Требования таможни по терминалу ВМТП</h3>
         <div class="p-4 mb-4 text-sm text-amber-800 rounded-lg bg-amber-50 border border-amber-200">
             Требования по контейнеру <strong>{container}</strong> за последние 30 дней не найдены.
         </div>
