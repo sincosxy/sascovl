@@ -19,12 +19,12 @@ UNIT_PATTERN = re.compile(r'\b[A-Za-z][\s-]*[A-Za-z][\s-]*[A-Za-z][\s-]*[A-Za-z]
 DATE_PATTERN = re.compile(r'\b(?:(\d{2})[\./](\d{2})[\./](\d{4})|(\d{4})-(\d{2})-(\d{2}))\b')
 
 
-TARGET_URLS = [
-    "https://www.vsct.info/index/klientam/docs/trebovaniya-na-vzveshivanie.html",
-    "https://www.vsct.info/index/klientam/docs/akt-izveshhenie.html",
-    "https://www.vsct.info/index/klientam/docs/midk.html",
-    "https://www.vsct.info/index/klientam/docs/trebovaniya-otd.html"
-]
+TARGET_URLS = {
+    "Взвешивание": "https://www.vsct.info/index/klientam/docs/trebovaniya-na-vzveshivanie.html",
+    "Янтарь": "https://www.vsct.info/index/klientam/docs/akt-izveshhenie.html",
+    "МИДК": "https://www.vsct.info/index/klientam/docs/midk.html",
+    "Досмотр": "https://www.vsct.info/index/klientam/docs/trebovaniya-otd.html"
+}
 
 
 def extract_document_date(first_page_text: str, file_name: str):
@@ -97,73 +97,74 @@ async def parse_and_save():
         #pdf_urls = get_pdf_links("https://www.vsct.info/index/klientam/docs/trebovaniya-na-vzveshivanie.html")
         all_pdf_urls = []
         print("🕵️‍♂️ Начинаем обход целевых страниц...")
-        for target_url in TARGET_URLS:
-            print(f"Сканирую страницу: {target_url}")
+        for group_name, target_url in TARGET_URLS.items():
+            print(f"Сканирую страницу: {group_name}")
             
             # Собираем ссылки с конкретной страницы
-            site_pdf_links = get_pdf_links(target_url)
-            print(f"  -> Найдено PDF: {len(site_pdf_links)}")
+            pdf_urls = get_pdf_links(target_url)
+            print(f"  -> Найдено PDF: {len(pdf_urls)}")
             
             # Добавляем в общий список
-            all_pdf_urls.extend(site_pdf_links)
+            #all_pdf_urls.extend(site_pdf_links)
         #print(f"Найдено документов: {len(pdf_urls)}")
 
-        unique_pdf_urls = list(set(all_pdf_urls))
-        print(f"\n Всего уникальных PDF для проверки: {len(unique_pdf_urls)}")
+        #unique_pdf_urls = list(set(all_pdf_urls))
+        #print(f"\n Всего уникальных PDF для проверки: {len(unique_pdf_urls)}")
 
-        for url in unique_pdf_urls:
-            clean_filename = urllib.parse.unquote(url.split('/')[-1])
-            
-            # Проверяем, был ли файл обработан ранее
-            result = await session.execute(select(ProcessedFile).filter_by(file_name=clean_filename))
-            already_processed = result.scalar_one_or_none()
-            if already_processed:
-                continue
+            for url in pdf_urls:
+                clean_filename = urllib.parse.unquote(url.split('/')[-1])
                 
-            print(f"Обработка файла: {clean_filename}...")
-            try:
-                response = requests.get(url, timeout=15)
-                response.raise_for_status()
-                
-                with pdfplumber.open(io.BytesIO(response.content)) as pdf:
-                    first_page_text = pdf.pages[0].extract_text() or "" if pdf.pages else ""
-                    doc_date = extract_document_date(first_page_text, clean_filename)
+                # Проверяем, был ли файл обработан ранее
+                result = await session.execute(select(ProcessedFile).filter_by(file_name=clean_filename))
+                already_processed = result.scalar_one_or_none()
+                if already_processed:
+                    continue
                     
-                    for page_num, page in enumerate(pdf.pages, start=1):
-                        tables = page.extract_tables()
-                        if not tables: 
-                            continue
-                            
-                        for table in tables:
-                            for row in table:
-                                clean_row = [str(cell).strip() if cell is not None else "" for cell in row]
-                                combined_text = " ".join(clean_row)
+                print(f"Обработка файла: {clean_filename}...")
+                try:
+                    response = requests.get(url, timeout=15)
+                    response.raise_for_status()
+                    
+                    with pdfplumber.open(io.BytesIO(response.content)) as pdf:
+                        first_page_text = pdf.pages[0].extract_text() or "" if pdf.pages else ""
+                        doc_date = extract_document_date(first_page_text, clean_filename)
+                        
+                        for page_num, page in enumerate(pdf.pages, start=1):
+                            tables = page.extract_tables()
+                            if not tables: 
+                                continue
                                 
-                                all_matches = UNIT_PATTERN.findall(combined_text)
-                                if all_matches:
-                                    for raw_unit in list(set(all_matches)):
-                                        clean_unit = clean_unit_code(raw_unit)
-                                        is_valid = validate_container_number(clean_unit)
-                                        
-                                        # Сохраняем через родную сессию CRM
-                                        record = ContainerArchive(
-                                            container_number=clean_unit,
-                                            file_name=clean_filename,
-                                            page_number=page_num,
-                                            raw_row_text=" | ".join(clean_row),
-                                            is_valid_iso=is_valid,
-                                            document_date=doc_date
-                                        )
-                                        session.add(record)
-                                        
-                # Фиксируем успешную обработку файла
-                session.add(ProcessedFile(file_name=clean_filename))
-                await session.commit()
-                print(f"✅ Успешно добавлен в базу: {clean_filename}")
-                
-            except Exception as e:
-                await session.rollback()
-                print(f"❌ Ошибка при обработке {clean_filename}: {e}")
+                            for table in tables:
+                                for row in table:
+                                    clean_row = [str(cell).strip() if cell is not None else "" for cell in row]
+                                    combined_text = " ".join(clean_row)
+                                    
+                                    all_matches = UNIT_PATTERN.findall(combined_text)
+                                    if all_matches:
+                                        for raw_unit in list(set(all_matches)):
+                                            clean_unit = clean_unit_code(raw_unit)
+                                            is_valid = validate_container_number(clean_unit)
+                                            
+                                            # Сохраняем через родную сессию CRM
+                                            record = ContainerArchive(
+                                                container_number=clean_unit,
+                                                file_name=clean_filename,
+                                                page_number=page_num,
+                                                raw_row_text=" | ".join(clean_row),
+                                                is_valid_iso=is_valid,
+                                                document_date=doc_date,
+                                                source_group=group_name
+                                            )
+                                            session.add(record)
+                                            
+                    # Фиксируем успешную обработку файла
+                    session.add(ProcessedFile(file_name=clean_filename))
+                    await session.commit()
+                    print(f"✅ Успешно добавлен в базу: {clean_filename}")
+                    
+                except Exception as e:
+                    await session.rollback()
+                    print(f"❌ Ошибка при обработке {clean_filename}: {e}")
 
 if __name__ == "__main__":
     asyncio.run(parse_and_save())

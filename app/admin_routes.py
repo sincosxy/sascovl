@@ -368,7 +368,7 @@ async def check_demands(
                     <thead class="bg-gray-50 text-gray-700 uppercase text-xs font-medium">
                         <tr>
                             <th class="px-4 py-3">Дата дока</th>
-                            <th class="px-4 py-3">Имя файла</th>
+                            <th class="px-4 py-3">Операция</th>
                             <th class="px-4 py-3">Стр.</th>
                             <th class="px-4 py-3">Контекст строки</th>
                         </tr>
@@ -380,7 +380,7 @@ async def check_demands(
             archive_html += f"""
                         <tr class="hover:bg-gray-50">
                             <td class="px-4 py-3 font-medium whitespace-nowrap">{doc_date}</td>
-                            <td class="px-4 py-3 text-blue-600 font-mono break-all">{rec.file_name}</td>
+                            <td class="px-4 py-3 text-blue-600 font-mono break-all"><a href='https://www.vsct.info/docs/{rec.file_name}'>{rec.source_group}</a></td>
                             <td class="px-4 py-3">{rec.page_number}</td>
                             <td class="px-4 py-3 text-gray-600 italic font-mono">{rec.raw_row_text}</td>
                         </tr>

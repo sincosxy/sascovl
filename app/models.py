@@ -251,7 +251,7 @@ class ContainerArchive(Base):
     
     # Используем server_default=func.now() для автоматического штампа времени базой данных
     created_at = Column(DateTime, server_default=func.now())
-
+    source_group = Column(String, nullable=True)
     __table_args__ = (
         Index('idx_containers_number', 'container_number'),
         Index('idx_document_date', 'document_date'),
