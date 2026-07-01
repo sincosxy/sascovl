@@ -6,32 +6,12 @@
 
 <tr class="hover:bg-gray-50 transition-colors border-t border-gray-200" id="main-row-{{ row_id }}">
     <input type="hidden" name="row_idx[]" value="{{ container_idx }}">
-    <!--td class="p-2"> 
-        <select name="equipment_id[]" required 
-            onchange="toggleReeferRow('{{ row_id }}', this)"
-            class="w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
-            <option value="">Тип</option>
-            {% for eq in equipments %}
-            <option value="{{ eq.id }}" 
-                data-is-reefer="{{ 'true' if 'RF' in eq.name else 'false' }}"
-                {% if container and container.equipment_id == eq.id %}selected{% endif %}>
-                {{ eq.name }}
-            </option>
-            {% endfor %}
-        </select>
-    </td-->
     <td class="p-2"> 
         <!-- Вместо селекта — просто текст -->
         <span class="font-bold text-gray-700">{{ order.equipment.name }}</span>
-        
         <!-- Скрытый ID оборудования, который берется из основного заказа -->
         <input type="hidden" name="equipment_id[]" value="{{ order.equipment_id }}">
     </td>
-    <!--td class="p-2 text-center">
-        <input type="checkbox" name="is_soc[]" onchange="toggleContainerInput(this)" value="{{ loop_index }}"
-            {% if container and container.is_soc %}checked{% endif %}
-            class="h-4 w-4 text-indigo-600 border-gray-300 rounded">
-    </td-->
     {% if order.is_soc %}
     <td class="p-2">
         <input type="text" name="container_number[]" placeholder="AAAA0000000"
@@ -46,14 +26,6 @@
         <input type="hidden" name="container_number[]" value="">
     {% endif %}
 
-    <!--td class="p-2">
-        <input type="number" step="0.01" name="weight_gross[]" placeholder="0.00" class="w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
-            value="{{ container.weight_gross if container else '' }}">
-    </td>
-    <td class="p-2">
-        <input type="number" step="1" name="pieces[]" placeholder="10" class="w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
-            value="{{ container.pieces if container else '' }}">
-    </td-->
     <td class="p-2">
         <input type="number" step="0.01" 
             id="total-weight-{{ row_id }}"
@@ -76,14 +48,7 @@
         <input id="cargo-{{ row_id }}" type="text" name="cargo_description[]" placeholder="..." class="w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
             value="{{ container.cargo_description if container else '' }}">
     </td>
-    <!--td class="p-2">
-        <label class="flex items-center gap-1 text-xs">
-        <input type="checkbox" name="is_lcl[{{ loop_index }}]" 
-               onchange="document.getElementById('lcl-wrapper-{{ row_id }}').classList.toggle('hidden')" 
-               class="rounded text-indigo-600">
-        Сборный
-        </label>
-    </td-->
+
     <td class="p-2">
         <input type="checkbox" name="is_lcl[]"  value="{{ loop_index }}"
             onchange="toggleLclMode('{{ row_id }}', this)" 

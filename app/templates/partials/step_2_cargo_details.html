@@ -1,31 +1,32 @@
 {% set dateload = order.loading_date %}
-<div id="step-container" class="max-w-5xl mx-auto p-6 bg-white shadow-lg rounded-lg" data-loading-date="{{ dateload }}">
-    <h2 class="text-2xl font-bold mb-6 text-gray-800 border-b pb-2">Шаг 3: Детализация контейнеров</h2>
+<!-- На мобилках убираем лишние паддинги (p-4 вместо p-6) и тени, чтобы не красть экранное время -->
+<div id="step-container" class="max-w-5xl mx-auto p-4 md:p-6 bg-white md:shadow-lg rounded-lg" data-loading-date="{{ dateload }}">
+    <h2 class="text-xl md:text-2xl font-bold mb-4 md:mb-6 text-gray-800 border-b pb-2">Шаг 3: Детализация контейнеров</h2>
     {% include 'partials/wizard_nav.html' %}
 
     {% if not order.equipment_id %}
-    <div class="p-8 text-center bg-red-50 border-2 border-dashed border-red-200 rounded-xl animate-pulse">
-        <div class="text-5xl mb-4">⚠️</div>
-        <h3 class="text-lg font-bold text-red-800">Тип оборудования не выбран</h3>
-        <p class="text-red-600 mb-6">Чтобы добавить контейнеры, нужно сначала указать их тип на первом шаге.</p>
+    <div class="p-6 md:p-8 text-center bg-red-50 border-2 border-dashed border-red-200 rounded-xl">
+        <div class="text-4xl md:text-5xl mb-4">⚠️</div>
+        <h3 class="text-base md:text-lg font-bold text-red-800">Тип оборудования не выбран</h3>
+        <p class="text-sm text-red-600 mb-6">Чтобы добавить контейнеры, нужно сначала указать их тип на первом шаге.</p>
         
         <button hx-get="/api/orders/{{ order_id }}/step-1" 
                 hx-target="#main-content"
-                class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium">
+                class="w-full md:w-auto px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium cursor-pointer">
             ← Вернуться на Шаг 1
         </button>
     </div>
     {% else %}
 
     <form hx-patch="/api/orders/{{ order_id }}/step-2" hx-target="#main-content" class="space-y-6">
-        <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-                <thead>
+        
+        <!-- Внимание: оборачиваем в блок, убираем overflow-x-auto, так как таблица больше не скроллится горизонтально -->
+        <div class="w-full">
+            <table class="w-full border-collapse block md:table">
+                <!-- Скрываем заголовки таблицы на мобилках полностью -->
+                <thead class="hidden md:table-header-group">
                     <tr class="bg-gray-50 text-gray-600 uppercase text-xs">
-                        <th class="p-3 border-b text-blue-700">
-                            Тип: {{ order.equipment.name }}
-                        </th>
-                        <!--th class="p-3 border-b text-center">SOC</th-->
+                        <th class="p-3 border-b text-blue-700">Тип: {{ order.equipment.name }}</th>
                         {% if order.is_soc %}
                             <th class="p-3 border-b">Номер контейнера</th>
                             <th class="p-3 border-b">Пломба</th>
@@ -33,17 +34,22 @@
                         <th class="p-3 border-b">Вес (кг)</th>
                         <th class="p-3 border-b">Мест</th>
                         <th class="p-3 border-b">Груз</th>
-                        <th class=""p-3 border-b">Сборный</th>
+                        <th class="p-3 border-b">Сборный</th>
                         <th class="p-3 border-b"></th>
                     </tr>
                 </thead>
-                <tbody id="containers-list" class="divide-y divide-gray-200">
+                
+                <!-- Показываем инфо о типе оборудования текстом для мобилок -->
+                <div class="block md:hidden bg-blue-50 text-blue-800 text-sm font-semibold p-3 rounded-md mb-4 border border-blue-200">
+                    Тип оборудования: {{ order.equipment.name }}
+                </div>
+
+                <!-- Тег tbody меняет поведение на сетку/блок на мобилках -->
+                <tbody id="containers-list" class="block md:table-row-group space-y-4 md:space-y-0 md:divide-y md:divide-gray-200">
                     {% if order.containers %}
                         {% for container in order.containers %}
                             {% set loop_index = loop.index0 %}
                             {% include 'partials/container_row.html' with context %}
-                            {#% include 'partials/container_row.html' %#}
-                            {# 'with context' прокинет loop.index0 автоматически как loop_index #}
                         {% endfor %}
                     {% else %}
                         {% set loop_index = 0 %}
@@ -53,26 +59,26 @@
             </table>
         </div>
 
-        <div class="flex justify-between items-center mt-6">
+        <!-- Нижняя панель действий: кнопки встают в стек на мобилках -->
+        <div class="flex flex-col md:flex-row gap-4 md:justify-between md:items-center mt-6 border-t md:border-t-0 pt-4 md:pt-0">
             <button type="button" 
                     hx-get="/api/orders/{{ order_id }}/add-container-row" 
-
-                    hx-vals='js:{index: document.querySelectorAll("#containers-list tr[id^=\"main-row-\"]").length}'
+                    hx-vals='js:{index: document.querySelectorAll("#containers-list > *[id^=\"main-row-\"]").length}'
                     hx-target="#containers-list" 
                     hx-swap="beforeend"
-                    class="flex items-center px-4 py-2 bg-indigo-50 text-indigo-700 rounded-md hover:bg-indigo-100 transition shadow-sm border border-indigo-200">
+                    class="flex items-center justify-center px-4 py-3 md:py-2 bg-indigo-50 text-indigo-700 rounded-md hover:bg-indigo-100 transition shadow-sm border border-indigo-200 font-medium cursor-pointer w-full md:w-auto">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"></path></svg>
                 Добавить строку
             </button>
 
-            <div class="flex space-x-3">
+            <div class="flex flex-col-reverse md:flex-row gap-2 md:space-x-3 md:gap-0">
                 <button type="button" 
                         hx-get="/api/orders/{{ order_id }}/step-1" 
                         hx-target="#step-container"
-                        class="px-6 py-2 text-gray-600 hover:text-gray-800 transition">
+                        class="px-6 py-3 md:py-2 text-gray-600 hover:text-gray-800 transition font-medium text-center cursor-pointer">
                     Назад
                 </button>
-                <button type="submit" class="px-8 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition shadow-md font-medium">
+                <button type="submit" class="px-8 py-3 md:py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition shadow-md font-bold text-center cursor-pointer w-full md:w-auto">
                     Далее: автодоставка →
                 </button>
             </div>

@@ -1,4 +1,4 @@
-<nav class="flex items-center justify-center space-x-4 mb-8 text-sm font-medium">
+<nav class="flex items-center justify-between md:justify-center w-full max-w-2xl mx-auto mb-8 text-sm font-medium px-2">
     {% set steps = [
         ('step-1', '1', 'МАРШРУТ'),
         ('step-2', '2', 'ГРУЗ'),
@@ -11,16 +11,25 @@
         {% set is_active = (current_step == path) if current_step else request.url.path.endswith(path) %}
         
         <button hx-get="/api/orders/{{ order_id }}/{{ path }}" hx-target="#main-content"
-                class="flex items-center {{ 'text-blue-600' if is_active else 'text-gray-500 hover:text-blue-500' }}">
-            <span class="w-7 h-7 flex items-center justify-center border-2 rounded-full mr-2 
-                {{ 'border-blue-600 bg-blue-50' if is_active else 'border-gray-300' }}">
+                class="flex flex-col md:flex-row items-center gap-1 md:gap-2 focus:outline-none cursor-pointer group relative">
+            
+            <!-- Кружок с цифрой -->
+            <span class="w-8 h-8 flex items-center justify-center border-2 rounded-full text-xs md:text-sm font-bold transition-all duration-200 shrink-0
+                {{ 'border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-500/20' if is_active else 'border-gray-300 text-gray-500 group-hover:border-blue-400 group-hover:text-blue-500 bg-white' }}">
                 {{ num }}
             </span>
-            {{ label }}
+            
+            <!-- Текст шага (Скрыт на мобилках в строке, но можно выводить под кружком) -->
+            <span class="text-[10px] md:text-sm uppercase tracking-wider md:tracking-normal font-semibold
+                {{ 'text-blue-600' if is_active else 'text-gray-400 group-hover:text-blue-500' }}">
+                {{ label }}
+            </span>
         </button>
 
         {% if not loop.last %}
-            <div class="h-px w-8 bg-gray-300"></div>
+            <!-- Адаптивная линия: на мобилках она гибкая (flex-1), на десктопе — фиксированная (w-12) -->
+            <div class="h-0.5 flex-1 md:flex-none md:w-12 bg-gray-200 transition-colors mx-2 md:mx-0 
+                {{ 'bg-blue-300' if is_active else 'bg-gray-200' }}"></div>
         {% endif %}
     {% endfor %}
 </nav>
