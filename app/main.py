@@ -661,7 +661,13 @@ async def save_step_2(
         .options(
             selectinload(CargoOrder.shipper),
             selectinload(CargoOrder.consignee),
-            selectinload(CargoOrder.notify_party)
+            selectinload(CargoOrder.notify_party),
+            selectinload(CargoOrder.pre_carriage_carrier),  # ЧИНИТ ТВОЮ ОШИБКУ ТУТ!
+            selectinload(CargoOrder.pre_carriage_carrier),  # На всякий случай, если есть вывоз
+            selectinload(CargoOrder.containers).selectinload(Container.items), # Чтобы контейнеры и их грузы тоже были в кэше
+            selectinload(CargoOrder.containers).selectinload(Container.equipment),
+            selectinload(CargoOrder.port_of_loading),  # Подгружаем порты для маршрута
+            selectinload(CargoOrder.port_of_discharge)
         )
         .where(CargoOrder.id == order_id)
     )

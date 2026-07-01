@@ -87,123 +87,165 @@
             </section>
         </div>
     </div>
-<section class="mt-8">
-    <h3 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-3.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-        </svg>
-        Детализация груза
-    </h3>
-    
-    <div class="overflow-hidden border border-slate-200/60 rounded-xl bg-white shadow-sm">
-        <table class="w-full text-sm text-left border-collapse">
-            <thead>
-                <tr class="bg-slate-50 text-slate-500 border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider">
-                    <th class="p-3 pl-4">Тип</th>
-                    <th class="p-3">Номер</th>
-                    <th class="p-3">Пломба</th>
-                    <th class="p-3">ПИН</th>
-                    <th class="p-3">Собственность</th>
-                    <th class="p-3 pr-4 text-right">Вес (брутто)</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-                {% for con in order.containers %}
-                <tr class="align-top transition-colors duration-150 {{ 'bg-slate-50/70 opacity-60' if con.is_cancelled else 'hover:bg-slate-50/40' }}">
-                    
-                    <!-- Тип и Температурный режим -->
-                    <td class="p-3 pl-4">
-                        <div class="font-semibold text-slate-800">{{ con.equipment.name }}</div>
-                        {% if 'RF' in con.equipment.name and con.temperature is not none %}
-                            <div class="text-[10px] text-sky-600 font-bold mt-0.5">🌡️ {{ con.temperature }}°C</div>
-                        {% endif %}
-                    </td>
-                    
-                    <!-- Номер контейнера -->
-                    <td class="p-3 font-mono text-xs">
-                        <div class="{{ 'text-rose-600 font-bold' if con.valid_number == False else 'text-slate-700' }}">
-                            {{ con.container_number or 'Назначается' }}
-                        </div>
-                    </td>
-                    
-                    <td class="p-3 text-slate-600">{{ con.seal or '-' }}</td>
-                    <td class="p-3 text-slate-600">{{ con.pin_code or '-' }}</td>
-                    
-                    <!-- Собственность -->
-                    <td class="p-3">
-                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase {{ 'bg-purple-100 text-purple-700' if con.is_soc else 'bg-blue-100 text-blue-700' }}">
-                            {{ 'SOC' if con.is_soc else 'COC' }}
-                        </span>
-                    </td>
-
-                    <!-- Вес (Брутто) -->
-                    <td class="p-3 pr-4 text-right font-bold text-slate-700">
-                        {{ "{:,.2f}".format(con.weight_gross) }} кг
-                    </td>
-                </tr>
-
-                <!-- ПОДСТРОКА СО СБОРНЫМ ГРУЗОМ (LCL) -->
-                {% if con.items %}
-                <tr class="bg-indigo-50/30">
-                    <td colspan="6" class="p-3 pl-8">
-                        <div class="text-[10px] font-bold text-indigo-400 uppercase mb-2">Содержимое контейнера:</div>
-                        <div class="space-y-1">
-                            {% for item in con.items %}
-                            <div class="flex justify-between text-xs border-b border-indigo-100/50 pb-1">
-                                <span class="text-indigo-900 italic">📦 {{ item.name }}</span>
-                                <span class="text-slate-500">{{ item.pieces }} мест / <b>{{ item.weight_gross }} кг</b></span>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </td>
-                </tr>
-                {% endif %}
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</section>
-    <!-- Кнопки действий -->
-    <div class="flex justify-between items-center mt-10 pt-6 border-t">
-        {% if order.status == 'draft' %}
-            <button hx-get="/api/orders/{{ order_id }}/step-3" hx-target="#main-content"
-                    class="text-gray-500 hover:text-gray-800 font-medium transition">
-                ← Вернуться к правкам
-            </button>
+    <section class="mt-8">
+        <h3 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5 px-1">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-3.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+            </svg>
+            Детализация груза
+        </h3>
         
-        <div class="flex gap-3">
-            <!-- Кнопка PDF (пока заглушка) -->
-            <!--button class="px-6 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                Черновик PDF
-            </button-->
-            <a href="/api/orders/{{ order_id }}/pdf" target="_blank" 
-                class="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 rounded border border-red-200 hover:bg-red-100">
-                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">...</svg>
-                    Скачать Booking Note (PDF)
-                </a>
+        <!-- На мобилках убираем жесткие рамки таблицы и делаем просто контейнер с отступами -->
+        <div class="overflow-hidden md:border md:border-slate-200/60 md:rounded-xl bg-transparent md:bg-white md:shadow-sm">
+            <table class="w-full text-sm text-left border-collapse block md:table">
+                
+                <!-- Скрываем десктопную шапку на мобилках полностью -->
+                <thead class="hidden md:table-header-group">
+                    <tr class="bg-slate-50 text-slate-500 border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider">
+                        <th class="p-3 pl-4">Тип</th>
+                        <th class="p-3">Номер</th>
+                        <th class="p-3">Пломба</th>
+                        <th class="p-3">ПИН</th>
+                        <th class="p-3">Собственность</th>
+                        <th class="p-3 pr-4 text-right">Вес (брутто)</th>
+                    </tr>
+                </thead>
+                
+                <!-- На мобилках строки идут независимыми блоками с отступами между ними (space-y-4) -->
+                <tbody class="block md:table-row-group space-y-4 md:space-y-0 divide-y-0 md:divide-y md:divide-slate-100">
+                    {% for con in order.containers %}
+                    
+                    <!-- Основная строка: на мобилке превращается в белую карточку с тенью -->
+                    <tr class="align-top transition-colors duration-150 block md:table-row bg-white md:bg-transparent p-4 rounded-xl md:rounded-none border border-slate-200/60 md:border-none shadow-sm md:shadow-none space-y-2 md:space-y-0 relative {{ 'bg-slate-50/70 opacity-60' if con.is_cancelled else 'hover:bg-slate-50/40' }}">
+                        
+                        <!-- Тип и Режим -->
+                        <td class="flex justify-between items-center md:table-cell p-0 md:p-3 md:pl-4 border-b border-slate-100 pb-2 md:border-none md:pb-0">
+                            <span class="block md:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider">Тип оборудования</span>
+                            <div>
+                                <div class="font-bold md:font-semibold text-slate-800 text-right md:text-left">{{ con.equipment.name }}</div>
+                                {% if 'RF' in con.equipment.name and con.temperature is not none %}
+                                    <div class="text-[10px] text-sky-600 font-bold mt-0.5 text-right md:text-left">🌡️ {{ con.temperature }}°C</div>
+                                {% endif %}
+                            </div>
+                        </td>
+                        
+                        <!-- Номер контейнера -->
+                        <td class="flex justify-between items-center md:table-cell p-0 md:p-3 font-mono text-xs">
+                            <span class="block md:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider font-sans">Номер</span>
+                            <div class="text-right md:text-left {{ 'text-rose-600 font-bold' if con.valid_number == False else 'text-slate-700' }}">
+                                {{ con.container_number or 'Назначается' }}
+                            </div>
+                        </td>
+                        
+                        <!-- Пломба -->
+                        <td class="flex justify-between items-center md:table-cell p-0 md:p-3 text-slate-600">
+                            <span class="block md:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider">Пломба</span>
+                            <span class="text-right md:text-left font-medium md:font-normal text-slate-700 md:text-slate-600">{{ con.seal or '-' }}</span>
+                        </td>
 
-            <!-- Финальное подтверждение -->
-            <button hx-post="/api/orders/{{ order_id }}/confirm" 
-                    hx-target="#main-content"
-                    hx-confirm="Вы уверены? После подтверждения редактирование будет невозможно."
-                    class="px-8 py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 shadow-xl transition-all transform hover:scale-105">
-                ПОДТВЕРДИТЬ И ОТПРАВИТЬ
-            </button>
+                        <!-- ПИН -->
+                        <td class="flex justify-between items-center md:table-cell p-0 md:p-3 text-slate-600">
+                            <span class="block md:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider">ПИН-код</span>
+                            <span class="text-right md:text-left font-medium md:font-normal text-slate-700 md:text-slate-600">{{ con.pin_code or '-' }}</span>
+                        </td>
+                        
+                        <!-- Собственность (SOC / COC) -->
+                        <td class="flex justify-between items-center md:table-cell p-0 md:p-3">
+                            <span class="block md:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider">Собственность</span>
+                            <div class="text-right md:text-left">
+                                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase {{ 'bg-purple-100 text-purple-700' if con.is_soc else 'bg-blue-100 text-blue-700' }}">
+                                    {{ 'SOC' if con.is_soc else 'COC' }}
+                                </span>
+                            </div>
+                        </td>
+
+                        <!-- Вес (Брутто) -->
+                        <td class="flex justify-between items-center md:table-cell p-0 md:p-3 md:pr-4 md:text-right font-bold text-slate-700 pt-2 border-t border-slate-100 md:border-none md:pt-0">
+                            <span class="block md:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider">Вес (брутто)</span>
+                            <span class="text-blue-700 md:text-slate-700">{{ "{:,.2f}".format(con.weight_gross) }} кг</span>
+                        </td>
+                    </tr>
+
+                    <!-- ПОДСТРОКА СО СБОРНЫМ ГРУЗОМ (LCL) -->
+                    {% if con.items %}
+                    <!-- На мобилке убираем отрицательный маржин, делаем аккуратную плашку под карточкой -->
+                    <tr class="block md:table-row bg-indigo-50/40 border border-indigo-100 rounded-xl p-3 -mt-2 md:mt-0 shadow-sm md:shadow-none">
+                        <td colspan="6" class="block md:table-cell p-0 md:p-3 md:pl-8">
+                            <div class="text-[10px] font-bold text-indigo-500 md:text-indigo-400 uppercase mb-2">Содержимое контейнера:</div>
+                            <div class="space-y-1">
+                                {% for item in con.items %}
+                                <div class="flex justify-between text-xs border-b border-indigo-100/30 pb-1.5 last:border-none last:pb-0">
+                                    <span class="text-indigo-950 font-medium md:font-normal md:text-indigo-900 italic">📦 {{ item.name }}</span>
+                                    <span class="text-slate-600 md:text-slate-500">{{ item.pieces }} мест / <b class="text-slate-800 md:text-slate-700">{{ item.weight_gross }} кг</b></span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
+    </section>
+    <!-- Кнопки действий -->
+    <div class="mt-10 pt-6 border-t border-gray-200">
+        {% if order.status == 'draft' %}
+            <!-- На мобильных вертикальный стек задом наперед, на десктопе — классическая строка -->
+            <div class="flex flex-col-reverse md:flex-row md:justify-between md:items-center gap-4">
+                
+                <!-- Ссылка "Назад" на мобилке падает в самый низ, растягиваясь для удобного тапа -->
+                <button hx-get="/api/orders/{{ order_id }}/step-3" hx-target="#main-content"
+                        class="w-full md:w-auto text-center text-gray-500 hover:text-gray-800 font-medium py-3 md:py-0 transition cursor-pointer">
+                    ← Вернуться к правкам
+                </button>
+            
+                <!-- Блок целевых действий: на мобилке тоже ложится вертикально -->
+                <div class="flex flex-col-reverse sm:flex-row gap-3 w-full md:w-auto">
+                    <!-- PDF Booking Note -->
+                    <a href="/api/orders/{{ order_id }}/pdf" target="_blank" 
+                    class="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-3 md:py-2 bg-red-50 text-red-700 rounded-md border border-red-200 hover:bg-red-100 text-sm font-medium transition">
+                        <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V6l-4-4H9z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v4h4" />
+                        </svg>
+                        Скачать Booking Note (PDF)
+                    </a>
+
+                    <!-- Финальное подтверждение: САМАЯ верхняя и заметная кнопка на мобилке -->
+                    <button hx-post="/api/orders/{{ order_id }}/confirm" 
+                            hx-target="#main-content"
+                            hx-confirm="Вы уверены? После подтверждения редактирование будет невозможно."
+                            class="w-full md:w-auto text-center px-8 py-3.5 md:py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 shadow-lg shadow-green-600/10 transition-all cursor-pointer uppercase tracking-wider text-xs md:text-sm">
+                        ПОДТВЕРДИТЬ И ОТПРАВИТЬ
+                    </button>
+                </div>
+            </div>
         {% else %}
-            <!-- Если статус не DRAFT, показываем только возврат в список -->
-            <button hx-get="/api/orders" hx-target="#main-content"
-                    class="text-blue-600 hover:underline font-medium">
-                ← В список заказов
-            </button>
-            <a href="/api/orders/{{ order_id }}/pdf" target="_blank" 
-                class="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 rounded border border-red-200 hover:bg-red-100">
-                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">...</svg>
-                    Скачать Booking Note (PDF)
-                </a>
-            <div class="text-sm text-gray-500 italic">
-                Заказ заблокирован для редактирования, так как он уже передан оператору.
+            <!-- Если статус не DRAFT (Заказ подтвержден) -->
+            <div class="flex flex-col-reverse md:flex-row md:justify-between md:items-center gap-4 text-center md:text-left">
+                
+                <!-- Кнопка возврата в список -->
+                <button hx-get="/api/orders" hx-target="#main-content"
+                        class="w-full md:w-auto text-center text-blue-600 hover:underline font-medium py-3 md:py-0 cursor-pointer">
+                    ← В список заказов
+                </button>
+                
+                <!-- Блок с PDF и плашкой блокировки -->
+                <div class="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                    <div class="w-full sm:w-auto text-xs text-gray-500 italic bg-gray-50 p-2.5 rounded-md border border-gray-100 md:border-none md:bg-transparent">
+                        Заказ заблокирован для редактирования.
+                    </div>
+                    
+                    <a href="/api/orders/{{ order_id }}/pdf" target="_blank" 
+                    class="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-3 md:py-2 bg-red-50 text-red-700 rounded-md border border-red-200 hover:bg-red-100 text-sm font-medium transition">
+                        <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V6l-4-4H9z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v4h4" />
+                        </svg>
+                        Скачать Booking Note (PDF)
+                    </a>
+                </div>
             </div>
         {% endif %}
     </div>
