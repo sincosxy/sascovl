@@ -1,160 +1,181 @@
 {% set row_id = range(1, 99999) | random if not container else container.id %}
 {% set container_idx = loop.index0 if loop is defined else loop_index %}
+{% set is_reefer = 'RF' in order.equipment.name %}
 
-
-<!-- Основная строка -->
-
-<tr class="hover:bg-gray-50 transition-colors border-t border-gray-200" id="main-row-{{ row_id }}">
+<!-- Основная строка, которая на мобилках становится красивой карточкой -->
+<tr class="block md:table-row bg-white md:bg-transparent p-4 rounded-xl border border-gray-200 md:border-b md:border-t-0 md:border-x-0 md:border-gray-200 md:hover:bg-gray-50 transition-colors shadow-sm md:shadow-none relative space-y-3 md:space-y-0" id="main-row-{{ row_id }}">
     <input type="hidden" name="row_idx[]" value="{{ container_idx }}">
-    <td class="p-2"> 
-        <!-- Вместо селекта — просто текст -->
-        <span class="font-bold text-gray-700">{{ order.equipment.name }}</span>
-        <!-- Скрытый ID оборудования, который берется из основного заказа -->
+    
+    <!-- Тип оборудования -->
+    <td class="block md:table-cell p-0 md:p-2"> 
+        <span class="block md:hidden text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Оборудование</span>
+        <span class="font-bold text-gray-700 text-sm md:text-base">{{ order.equipment.name }}</span>
         <input type="hidden" name="equipment_id[]" value="{{ order.equipment_id }}">
     </td>
+
+    <!-- Блок SOC (Номер и Пломба) -->
     {% if order.is_soc %}
-    <td class="p-2">
+    <td class="block md:table-cell p-0 md:p-2">
+        <span class="block md:hidden text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Номер контейнера</span>
         <input type="text" name="container_number[]" placeholder="AAAA0000000"
-            class="w-full rounded-md border-gray-300 shadow-sm sm:text-sm uppercase"
+            class="w-full rounded-md border-gray-300 shadow-sm text-sm uppercase focus:ring-blue-500 focus:border-blue-500"
             value="{{ container.container_number if container else '' }}">
     </td>
-    <td class="p-2">
-        <input type="text" name="seal[]" placeholder="S12345" class="w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
+    <td class="block md:table-cell p-0 md:p-2">
+        <span class="block md:hidden text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Пломба</span>
+        <input type="text" name="seal[]" placeholder="S12345" 
+            class="w-full rounded-md border-gray-300 shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500"
             value="{{ container.seal if container else '' }}">
     </td>
     {% else %}
         <input type="hidden" name="container_number[]" value="">
     {% endif %}
 
-    <td class="p-2">
+    <!-- Вес gross -->
+    <td class="block md:table-cell p-0 md:p-2">
+        <span class="block md:hidden text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Вес (кг)</span>
         <input type="number" step="0.01" 
             id="total-weight-{{ row_id }}"
             name="weight_gross[]" 
             placeholder="0.00" 
             {% if container and container.is_lcl %}readonly{% endif %}
-            class="w-full rounded-md border-gray-300 bg-gray-50 shadow-sm sm:text-sm"
+            class="w-full rounded-md border-gray-300 bg-gray-50 shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500"
             value="{{ container.weight_gross if container else '' }}">
     </td>
-    <td class="p-2">
+
+    <!-- Места -->
+    <td class="block md:table-cell p-0 md:p-2">
+        <span class="block md:hidden text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Мест</span>
         <input type="number" step="1" 
             id="total-pieces-{{ row_id }}"
             name="pieces[]" 
             placeholder="10" 
             {% if container and container.is_lcl %}readonly{% endif %}
-            class="w-full rounded-md border-gray-300 bg-gray-50 shadow-sm sm:text-sm"
+            class="w-full rounded-md border-gray-300 bg-gray-50 shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500"
             value="{{ container.pieces if container else '' }}">
     </td>
-    <td class="p-2">
-        <input id="cargo-{{ row_id }}" type="text" name="cargo_description[]" placeholder="..." class="w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
+
+    <!-- Наименование груза -->
+    <td class="block md:table-cell p-0 md:p-2">
+        <span class="block md:hidden text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Описание груза</span>
+        <input id="cargo-{{ row_id }}" type="text" name="cargo_description[]" placeholder="..." 
+            class="w-full rounded-md border-gray-300 shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500"
             value="{{ container.cargo_description if container else '' }}">
     </td>
 
-    <td class="p-2">
-        <input type="checkbox" name="is_lcl[]"  value="{{ loop_index }}"
-            onchange="toggleLclMode('{{ row_id }}', this)" 
-            {% if container and container.is_lcl %}checked{% endif %}
-            class="rounded text-indigo-600">
+    <!-- Чекбокс "Сборный" -->
+    <td class="block md:table-cell p-0 md:p-2">
+        <label class="flex items-center gap-2 cursor-pointer mt-1 md:mt-0">
+            <input type="checkbox" name="is_lcl[]" value="{{ loop_index }}"
+                onchange="toggleLclMode('{{ row_id }}', this)" 
+                {% if container and container.is_lcl %}checked{% endif %}
+                class="rounded text-indigo-600 h-4 w-4 border-gray-300 focus:ring-indigo-500">
+            <span class="block md:hidden text-sm font-medium text-gray-700">Сборный груз (LCL)</span>
+        </label>
     </td>
-    <td class="p-2 text-right">
-        <button type="button" onclick="removeContainerRow('{{ row_id }}')" class="text-red-400 hover:text-red-600">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+
+    <!-- Кнопка удаления (На мобилке выносим в абсолют в верхний угол карточки) -->
+    <td class="absolute top-2 right-2 md:relative md:top-0 md:right-0 block md:table-cell p-0 md:p-2 text-right">
+        <button type="button" onclick="removeContainerRow('{{ row_id }}')" 
+                class="text-red-400 hover:text-red-600 p-2 md:p-0 rounded-lg hover:bg-red-50 md:hover:bg-transparent transition cursor-pointer"
+                aria-label="Удалить контейнер">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
         </button>
     </td>
 </tr>
 
 
-<!-- Подстрока для позиций груза -->
+<!-- Подстрока для позиций сборного груза -->
 <tr id="lcl-wrapper-{{ row_id }}" 
-    class="{% if not (container and container.is_lcl) %}hidden{% endif %} bg-gray-50">
-    <td colspan="7" class="p-4">
+    class="{% if not (container and container.is_lcl) %}hidden{% endif %} [:not(.hidden)]:md:table-row bg-slate-50 border-x border-b border-gray-200 md:border-none rounded-b-xl -mt-4 md:mt-0 p-3 md:p-0">
+    <td colspan="7" class="block md:table-cell p-0 md:p-4">
         <div id="cargo-items-{{ row_id }}" class="space-y-2">
             <p class="text-xs font-bold text-gray-500 uppercase mb-2">Содержимое контейнера:</p>
             
             {% if container and container.items %}
-                    {# Если в базе уже есть грузы, выводим их все #}
-                    {% for item in container.items %}
-                    <div class="flex gap-2 items-center cargo-item-row">
-                        <input type="text" name="item_name[{{ container_idx  }}][]" 
-                            value="{{ item.name }}" class="flex-1 text-xs border rounded p-1">
-                        <input type="number" name="item_weight[{{ container_idx  }}][]" 
-                            value="{{ item.weight_gross }}" class="w-20 text-xs border rounded p-1">
-                        <input type="number" name="item_pieces[{{ container_idx  }}][]" 
-                            value="{{ item.pieces }}" class="w-16 text-xs border rounded p-1">
-                        
-                        {% if loop.first %}
-                            <button type="button" onclick="addCargoItem('{{ row_id }}', '{{ loop_index_outer }}')" class="text-blue-500 text-xl">+</button>
-                        {% else %}
-                            <button type="button" onclick="this.parentElement.remove(); calculateTotals('{{ row_id }}')" class="text-red-500">×</button>
-                        {% endif %}
-                    </div>
-                    {% endfor %}
-                {% else %}
-
-            <!-- Первая строка груза (всегда есть) -->
-            <div class="flex gap-2 items-center cargo-item-row">
-                <input type="text" name="item_name[{{ loop_index }}][]" placeholder="Груз" class="flex-1 text-xs border rounded p-1">
-                <input type="number" name="item_weight[{{ loop_index }}][]" placeholder="Вес" class="w-20 text-xs border rounded p-1">
-                <input type="number" name="item_pieces[{{ loop_index }}][]" placeholder="Мест" class="w-16 text-xs border rounded p-1">
-                <button type="button" onclick="addCargoItem('{{ row_id }}', '{{ loop_index }}')" class="text-blue-500 text-xl">+</button>
-            </div>
+                {% for item in container.items %}
+                <div class="flex gap-2 items-center cargo-item-row">
+                    <input type="text" name="item_name[{{ container_idx }}][]" value="{{ item.name }}" placeholder="Груз" class="flex-1 text-xs border rounded p-2 md:p-1 bg-white">
+                    <input type="number" name="item_weight[{{ container_idx }}][]" value="{{ item.weight_gross }}" placeholder="Вес" class="w-20 md:w-24 text-xs border rounded p-2 md:p-1 bg-white">
+                    <input type="number" name="item_pieces[{{ container_idx }}][]" value="{{ item.pieces }}" placeholder="Мест" class="w-16 md:w-20 text-xs border rounded p-2 md:p-1 bg-white">
+                    
+                    {% if loop.first %}
+                        <button type="button" onclick="addCargoItem('{{ row_id }}', '{{ container_idx }}')" class="text-blue-500 text-2xl px-2 cursor-pointer">+</button>
+                    {% else %}
+                        <button type="button" onclick="this.parentElement.remove(); calculateTotals('{{ row_id }}')" class="text-red-500 text-xl px-2 cursor-pointer">×</button>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+                <!-- Первая строка груза по умолчанию -->
+                <div class="flex gap-2 items-center cargo-item-row">
+                    <input type="text" name="item_name[{{ loop_index }}][]" placeholder="Груз" class="flex-1 text-xs border rounded p-2 md:p-1 bg-white">
+                    <input type="number" name="item_weight[{{ loop_index }}][]" placeholder="Вес" class="w-20 md:w-24 text-xs border rounded p-2 md:p-1 bg-white">
+                    <input type="number" name="item_pieces[{{ loop_index }}][]" placeholder="Мест" class="w-16 md:w-20 text-xs border rounded p-2 md:p-1 bg-white">
+                    <button type="button" onclick="addCargoItem('{{ row_id }}', '{{ loop_index }}')" class="text-blue-500 text-2xl px-2 cursor-pointer">+</button>
+                </div>
             {% endif %}
         </div>
     </td>
 </tr>
 
-<!-- строка рефки -->
+
+<!-- Строка рефрежима -->
 {% set is_reefer = 'RF' in order.equipment.name %}
 <tr id="reefer-row-{{ row_id }}" 
-    class="bg-blue-50/50 {% if not is_reefer %}hidden{% endif %} reefer-params-row">
-    <td colspan="7" class="p-4 border-b border-gray-200">
-        <div class="flex flex-wrap items-center gap-6 text-xs">
+    class="{% if not is_reefer %}hidden{% endif %} [:not(.hidden)]:md:table-row bg-blue-50/60 border-x border-b border-blue-200 md:border-none rounded-b-xl -mt-4 md:mt-0 p-4 md:p-0 reefer-params-row">
+    <td colspan="7" class="block md:table-cell p-0 md:p-4 md:border-b md:border-gray-200">
+        <div class="flex flex-col md:flex-row md:flex-wrap md:items-center gap-4 md:gap-6 text-xs">
             
-            {# Блок Температуры #}
-            <div class="flex items-center gap-2">
-                <span class="font-bold text-blue-700 uppercase whitespace-nowrap">🌡️ Режим:</span>
-                <input type="number" step="1" name="temperature[]" 
-                       value="{{ container.temperature if container and container.temperature is not none else '' }}" 
-                       placeholder="°C"
-                       class="w-20 rounded border-gray-300 p-1 text-sm focus:ring-blue-500 focus:border-blue-500">
+            <!-- Блок Температуры и Вентиляции -->
+            <div class="flex items-center justify-between md:justify-start gap-4 border-b border-blue-100/50 md:border-none pb-3 md:pb-0">
+                <div class="flex items-center gap-2 flex-1 md:flex-initial">
+                    <span class="font-bold text-blue-700 uppercase whitespace-nowrap">🌡️ Режим:</span>
+                    <input type="number" step="1" name="temperature[]" 
+                           value="{{ container.temperature if container and container.temperature is not none else '' }}" 
+                           placeholder="°C"
+                           class="w-full md:w-20 rounded border-gray-300 p-2 md:p-1 text-sm bg-white focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                
+                <label class="flex items-center gap-2 cursor-pointer bg-white md:bg-transparent p-2 md:p-0 rounded border border-blue-200 md:border-none shadow-sm md:shadow-none select-none shrink-0">
+                    <input type="checkbox" name="ventilation[]" value="{{ loop_index }}"
+                           {% if container and container.ventilation %}checked{% endif %}
+                           class="rounded text-blue-600 border-gray-300 h-4 w-4">
+                    <span class="font-medium text-gray-700 md:text-inherit">Вент.</span>
+                </label>
             </div>
-            
-            {# Вентиляция #}
-            <label class="flex items-center gap-1.5 cursor-pointer">
-                <input type="checkbox" name="ventilation[]" value="{{ loop_index }}"
-                       {% if container and container.ventilation %}checked{% endif %}
-                       class="rounded text-blue-600 border-gray-300">
-                <span class="font-medium">Вент.</span>
-            </label>
 
-            <div class="h-6 w-px bg-gray-300 mx-2"></div> {# Разделитель #}
+            <div class="hidden md:block h-6 w-px bg-gray-300 mx-2"></div>
 
-            {# Объединенный блок Подключение #}
-            <div class="flex items-center gap-3 bg-white/50 p-1.5 px-3 rounded-md border border-blue-100 shadow-sm">
-                <span class="font-bold text-blue-700 uppercase whitespace-nowrap">🔌 Подключение:</span>
+            <!-- Объединенный блок Подключение -->
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-white p-3 md:p-1.5 md:px-3 rounded-lg md:rounded-md border border-blue-100 shadow-sm md:shadow-none">
+                <span class="font-bold text-blue-700 uppercase whitespace-nowrap flex items-center gap-1">
+                    🔌 <span class="text-[11px] md:text-xs">Подключение:</span>
+                </span>
                 
                 <input type="date" 
                     id="date-{{ row_id }}"
                     name="plug_start_date[]" 
                     value="{{ container.plug_start_date if container and container.plug_start_date else '' }}"
                     {% if not (container and (container.port_plug or container.port_plug is none)) %} readonly class="readOnly"{% endif %}
-                    class="rounded border-gray-300 p-1 text-sm focus:ring-blue-500 readOnly:bg-gray-100 readOnly:text-gray-400">
+                    class="w-full sm:w-auto rounded border-gray-300 p-2 md:p-1 text-sm focus:ring-blue-500 readOnly:bg-gray-100 readOnly:text-gray-400">
 
-                <div class="flex items-center gap-3 ml-2">
-                    <label class="flex items-center gap-1.5 cursor-pointer">
+                <div class="flex items-center justify-around sm:justify-start gap-4 sm:ml-2 border-t border-gray-100 sm:border-none pt-2 sm:pt-0">
+                    <label class="flex items-center gap-2 cursor-pointer p-1.5 sm:p-0 select-none">
                         <input type="checkbox" 
                             name="port_plug[]" 
                             value="{{ loop_index }}"
                             onchange="toggleDateInput(this, 'date-{{ row_id }}')"
                             {% if container and (container.port_plug or container.port_plug is none) %}checked{% endif %}
-                            class="rounded text-blue-600 border-gray-300">
-                        <span>Порт</span>
+                            class="rounded text-blue-600 border-gray-300 h-4 w-4">
+                        <span class="text-sm sm:text-xs font-medium text-gray-700 md:text-inherit">Порт</span>
                     </label>
 
-                    <label class="flex items-center gap-1.5 cursor-pointer">
+                    <label class="flex items-center gap-2 cursor-pointer p-1.5 sm:p-0 select-none">
                         <input type="checkbox" name="vessel_plug[]" value="{{ loop_index }}"
                                {% if container and (container.vessel_plug or container.vessel_plug is none) %}checked{% endif %}
-                               class="rounded text-blue-600 border-gray-300">
-                        <span>Судно</span>
+                               class="rounded text-blue-600 border-gray-300 h-4 w-4">
+                        <span class="text-sm sm:text-xs font-medium text-gray-700 md:text-inherit">Судно</span>
                     </label>
                 </div>
             </div>
@@ -166,28 +187,29 @@
 <script>
 function addCargoItem(rowId, containerIdx) {
     const container = document.getElementById(`cargo-items-${rowId}`);
+    // Паддинг p-2 для мобилки, md:p-1 для десктопа + аккуратный кликабельный крестик
     const html = `
         <div class="flex gap-2 items-center mt-2 cargo-item-row">
-            <input type="text" name="item_name[${containerIdx}][]" placeholder="Груз" class="flex-1 text-xs border rounded p-1">
-            <input type="number" name="item_weight[${containerIdx}][]" placeholder="Вес" class="w-20 text-xs border rounded p-1">
-            <input type="number" name="item_pieces[${containerIdx}][]" placeholder="Мест" class="w-16 text-xs border rounded p-1">
-            <button type="button" onclick="this.parentElement.remove()" class="text-red-500">×</button>
+            <input type="text" name="item_name[${containerIdx}][]" placeholder="Груз" class="flex-1 text-xs border rounded p-2 md:p-1 bg-white focus:ring-blue-500 focus:border-blue-500">
+            <input type="number" name="item_weight[${containerIdx}][]" placeholder="Вес" class="w-20 md:w-24 text-xs border rounded p-2 md:p-1 bg-white focus:ring-blue-500 focus:border-blue-500">
+            <input type="number" name="item_pieces[${containerIdx}][]" placeholder="Мест" class="w-16 md:w-20 text-xs border rounded p-2 md:p-1 bg-white focus:ring-blue-500 focus:border-blue-500">
+            <button type="button" onclick="this.parentElement.remove(); calculateTotals('${rowId}')" class="text-red-500 text-xl px-2 cursor-pointer hover:text-red-700">×</button>
         </div>`;
     container.insertAdjacentHTML('beforeend', html);
 }
 
 function toggleDateInput(checkbox, dateInputId) {
     const dateInput = document.getElementById(dateInputId);
-    //const dateValue = dateInput.value;
     if (dateInput) {
         dateInput.readOnly = !checkbox.checked;
         
-        // Опционально: очищать дату при снятии галки
         if (!checkbox.checked) {
             dateInput.value = "";
             dateInput.classList.add('bg-gray-100');
+            dateInput.classList.remove('bg-white');
         } else {
             dateInput.classList.remove('bg-gray-100');
+            dateInput.classList.add('bg-white');
             dateInput.value = document.getElementById('step-container').dataset.loadingDate;
         }
     }
@@ -204,19 +226,25 @@ function toggleLclMode(rowId, checkbox) {
         piecesInput.readOnly = true;
         cargo.value = 'Сборный';
         cargo.readOnly = true;
-        weightInput.classList.add('bg-gray-100');
-        piecesInput.classList.add('bg-gray-100');
+        
+        // Меняем bg-gray-50 и bg-white на заблокированный серый bg-gray-100
+        weightInput.classList.replace('bg-gray-50', 'bg-gray-100');
+        piecesInput.classList.replace('bg-gray-50', 'bg-gray-100');
         cargo.classList.add('bg-gray-100');
+        
         lclWrapper.classList.remove('hidden');
-        calculateTotals(rowId); // Считаем сразу при включении
+        calculateTotals(rowId); 
     } else {
         weightInput.readOnly = false;
         piecesInput.readOnly = false;
         cargo.value = '';
         cargo.readOnly = false;
-        weightInput.classList.remove('bg-gray-100');
-        piecesInput.classList.remove('bg-gray-100');
+        
+        // Возвращаем исходные цвета полей для ручного ввода
+        weightInput.classList.replace('bg-gray-100', 'bg-gray-50');
+        piecesInput.classList.replace('bg-gray-100', 'bg-gray-50');
         cargo.classList.remove('bg-gray-100');
+        
         lclWrapper.classList.add('hidden');
     }
 }
@@ -225,7 +253,6 @@ function calculateTotals(rowId) {
     const container = document.getElementById(`lcl-wrapper-${rowId}`);
     if (!container) return;
 
-    // Ищем все инпуты веса и мест внутри этого конкретного контейнера
     const weightInputs = container.querySelectorAll('input[name^="item_weight"]');
     const piecesInputs = container.querySelectorAll('input[name^="item_pieces"]');
 
@@ -240,15 +267,13 @@ function calculateTotals(rowId) {
         totalPieces += parseInt(input.value) || 0;
     });
 
-    // Записываем результат в главные поля контейнера
     document.getElementById(`total-weight-${rowId}`).value = totalWeight.toFixed(2);
     document.getElementById(`total-pieces-${rowId}`).value = totalPieces;
 }
 
-// Слушатель событий: отлавливаем любой ввод в зоне грузов
+// Слушатель событий на ввод данных внутри LCL
 document.addEventListener('input', function(e) {
     if (e.target.name && (e.target.name.includes('item_weight') || e.target.name.includes('item_pieces'))) {
-        // Находим ближайший ID строки
         const wrapper = e.target.closest('[id^="lcl-wrapper-"]');
         if (wrapper) {
             const rowId = wrapper.id.replace('lcl-wrapper-', '');
@@ -257,11 +282,18 @@ document.addEventListener('input', function(e) {
     }
 });
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Пересчитываем суммы для всех контейнеров, где включен LCL
+// Первичный обсчет при загрузке страницы (работает в том числе и для динамических ответов HTMX)
+function initLclTotals() {
     document.querySelectorAll('input[name="is_lcl[]"]:checked').forEach(checkbox => {
-        const rowId = checkbox.closest('tr').id.replace('main-row-', '');
-        calculateTotals(rowId);
+        const tr = checkbox.closest('tr');
+        if (tr && tr.id) {
+            const rowId = tr.id.replace('main-row-', '');
+            calculateTotals(rowId);
+        }
     });
-});
+}
+
+document.addEventListener('DOMContentLoaded', initLclTotals);
+// Важно для HTMX: переинициализация после подгрузки контента в DOM
+document.body.addEventListener('htmx:afterSwap', initLclTotals);
 </script>
