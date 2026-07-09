@@ -1034,6 +1034,9 @@ async def get_order_summary(
             selectinload(CargoOrder.port_of_discharge),
             selectinload(CargoOrder.shipper),
             selectinload(CargoOrder.consignee),
+            #selectinload(CargoOrder.notify_party),       # ДОБАВЛЕНО: Уведомляемая сторона
+            selectinload(CargoOrder.pre_carriage_carrier), # ДОБАВЛЕНО: Перевозчик на подачу (до вокзала/порта)
+            #selectinload(CargoOrder.on_carriage_carrier),  # ДОБАВЛЕНО: Перевозчик на вывоз (после порта)
             selectinload(CargoOrder.equipment) # Общий тип из Шага 1
         )
         .where(CargoOrder.id == order_id)
