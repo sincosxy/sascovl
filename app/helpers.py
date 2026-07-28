@@ -1,4 +1,6 @@
 import requests, json, time
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo
 from typing import Dict, Optional
@@ -57,8 +59,21 @@ def validate_container_number(number: str) -> bool:
 def fit_request(method, url, token, payload=None):
     headers = {
         "Authorization": f"Bearer {token}",
-        "Accept": "application/json"
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'ru-RU,ru;q=0.9',
+        'Connection': 'close' # Принудительно закрываем сессию, чтобы избежать RemoteDisconnected на втором запросе
     }
+
+    session = requests.Session()
+    retries = Retry(
+        total=3,                # Количество попыток
+        backoff_factor=1,       # Пауза между попытками (1с, 2с, 4с)
+        status_forcelist=[500, 502, 503, 504],
+        raise_on_status=False
+    )
+    session.mount('https://', HTTPAdapter(max_retries=retries))
+    
     try:
         if method == 'GET':
             response = requests.get(url, headers=headers, params=payload, timeout=10)
@@ -78,11 +93,14 @@ def fit_request(method, url, token, payload=None):
 def get_schedule(token, date_from, from_loc, to_loc):
     # 1. Получаем ID для локации ОТКУДА
     res_from = fit_request('GET', 'https://api.fesco.com/api/v1/lk/handbooks/locations', token, {"text": from_loc})
-    from_id = next((loc['id'] for loc in res_from.get('data', []) if loc['loc_name'] == from_loc), None) if res_from else None
+    # Безопасное получение списка: если dict пустой или data == None, запишется []
+    from_data = (res_from or {}).get('data') or []
+    from_id = next((loc['id'] for loc in from_data if loc.get('loc_name') == from_loc), None)
 
     # 2. Получаем ID для локации КУДА
     res_to = fit_request('GET', 'https://api.fesco.com/api/v1/lk/handbooks/locations', token, {"text": to_loc})
-    to_id = next((loc['id'] for loc in res_to.get('data', []) if loc['loc_name'] == to_loc), None) if res_to else None
+    to_data = (res_to or {}).get('data') or []
+    to_id = next((loc['id'] for loc in to_data if loc.get('loc_name') == to_loc), None)
 
     # Проверка: нашли ли мы оба ID
     if not from_id or not to_id:
