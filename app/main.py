@@ -113,7 +113,19 @@ async def login_browser(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Неверный email или пароль"
             )
-    
+        
+    if not user.is_active:
+        if is_htmx:
+            return HTMLResponse(
+                content="Учетная запись деактивирована. Обратитесь в поддержку.", 
+                status_code=200 # HTMX выведет этот текст пользователю
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, # Для API логичнее 403 (Запрещено)
+                detail="Учетная запись деактивирована"
+            )
+        
     token = create_access_token(data={"sub": user.email, "role": user.role.value})
     if is_htmx:
         res = Response()
