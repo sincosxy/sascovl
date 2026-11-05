@@ -1,13 +1,13 @@
 from fastapi import APIRouter, FastAPI, Depends, HTTPException, status, Request, Response, Form, BackgroundTasks, Query
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm 
-from app.helpers import validate_container_number, get_schedule, format_vladivostok_time, parse_datetime, verify_auth_cookie, render_demands_table, get_vmtp_demands
+from app.helpers import validate_container_number, get_schedule, format_vladivostok_time, parse_datetime, render_demands_table, get_vmtp_demands
 from app.db import engine, Base, get_db, dadatoken
 from sqlalchemy import select, delete , update, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
 from app.models import User, Counterparty, CargoOrder, UserRole, Port, TransportType, Equipment, Container, Company, CargoItem, Voyage, Vessel, ContainerArchive 
-from app.auth import verify_password, create_access_token, get_current_user, hash_password 
+from app.auth import verify_password, create_access_token, get_current_user, hash_password, require_staff, require_admin 
 from app.schemas import Token, UserLogin, CounterpartyCreate, CounterpartyRead, OrderRead, UserCreate
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -21,7 +21,7 @@ fit = settings.FIT
 
 router = APIRouter(
     prefix="/admin",
-    dependencies=[Depends(verify_auth_cookie)],
+    dependencies=[Depends(require_staff)],
     tags=["admin"]
 )
 
@@ -92,7 +92,7 @@ async def operator_dashboard(
         return response
 
 # Получение формы
-@router.get("/edit-user-form/{user_id}")
+@router.get("/edit-user-form/{user_id}", dependencies=[Depends(require_admin)])
 async def get_user_form(request: Request, user_id: int = None, db: AsyncSession = Depends(get_db)):
     user = None
     if user_id:
@@ -106,7 +106,7 @@ async def get_user_form(request: Request, user_id: int = None, db: AsyncSession 
         "user": user, "companies": companies
     })
 
-@router.get("/create-user-form")
+@router.get("/create-user-form", dependencies=[Depends(require_admin)])
 async def get_create_user_form(request: Request, db: AsyncSession = Depends(get_db)):
     # Загружаем компании, чтобы привязать нового юзера к одной из них
     comp_res = await db.execute(select(Company).where(Company.is_deleted == False))
@@ -119,13 +119,15 @@ async def get_create_user_form(request: Request, db: AsyncSession = Depends(get_
 
 
 # Сохранение/Обновление
-@router.post("/update-user-form/{user_id}")
+@router.post("/update-user-form/{user_id}", dependencies=[Depends(require_admin)])
 async def handle_user_save(request: Request, user_id: int = None, db: AsyncSession = Depends(get_db)):
     form = await request.form()
     
     if user_id:
         res = await db.execute(select(User).where(User.id == user_id))
         user = res.scalar_one_or_none()
+        if user is None:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
     else:
         user = User(role=UserRole.USER)
         db.add(user)
@@ -148,7 +150,7 @@ async def handle_user_save(request: Request, user_id: int = None, db: AsyncSessi
     response.headers["HX-Trigger"] = "closeModal"
     return response
 
-@router.delete("/delete-user/{user_id}")
+@router.delete("/delete-user/{user_id}", dependencies=[Depends(require_admin)])
 async def delete_user(user_id: int, db: AsyncSession = Depends(get_db)):
     res = await db.execute(select(User).where(User.id == user_id))
     user = res.scalar_one_or_none()

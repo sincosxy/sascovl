@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from jose import jwt, JWTError
 from app.config import settings
 from app.db import get_db
-from app.models import User
+from app.models import User, UserRole
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
 
@@ -25,14 +25,15 @@ async def get_current_user(
         if auth_header and auth_header.startswith("Bearer "):
             token = auth_header.split(" ")[1]
     
-    if not token:
-        raise HTTPException(status_code=401, detail="Not authorized")
-
+    # HX-Redirect: HTMX-запрос с просроченным/поддельным токеном уводит на страницу входа
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
+        headers={"WWW-Authenticate": "Bearer", "HX-Redirect": "/login"},
     )
+
+    if not token:
+        raise credentials_exception
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         email: str = payload.get("sub")
@@ -44,8 +45,26 @@ async def get_current_user(
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalars().first()
 
-    if user is None:
+    # Деактивированный пользователь теряет доступ сразу, а не когда истечёт токен
+    if user is None or not user.is_active:
         raise credentials_exception
+    return user
+
+
+STAFF_ROLES = (UserRole.ADMIN, UserRole.OPERATOR)
+
+
+async def require_staff(user: User = Depends(get_current_user)) -> User:
+    """Оператор или администратор. Клиента (USER) отправляет на главную."""
+    if user.role not in STAFF_ROLES:
+        raise HTTPException(status_code=403, detail="Доступ запрещен", headers={"HX-Redirect": "/"})
+    return user
+
+
+async def require_admin(user: User = Depends(get_current_user)) -> User:
+    """Только администратор."""
+    if user.role != UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Доступ запрещен")
     return user
 
 

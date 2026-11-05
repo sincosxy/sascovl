@@ -134,22 +134,6 @@ def parse_datetime(dt_str: str) -> datetime | None:
     except ValueError:
         return None
     
-async def verify_auth_cookie(request: Request):
-    # Ищем вашу куку, например, "access_token"
-    access_token = request.cookies.get("access_token")
-    
-    if not access_token:
-        # Если это HTMX-запрос, можно вернуть специальный заголовок для редиректа на логин
-        # Если обычный запрос — кидаем ошибку или редиректим
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, 
-            detail="Неавторизован"
-        )
-    
-    # Здесь может быть логика проверки токена в БД/Redis
-    return access_token
-
-
 class TokenManager:
     def __init__(self, username: str, password: str):
         self.username = username

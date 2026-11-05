@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Request, Response, Form, BackgroundTasks
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm 
-from app.helpers import validate_container_number, get_schedule, format_vladivostok_time, parse_datetime, verify_auth_cookie
+from app.helpers import validate_container_number, get_schedule, format_vladivostok_time, parse_datetime
 from app.voyages_routes import router as voyages_router
 from app.customer_routes import router as customer_router
 from app.containers_routes import router as containers_router
@@ -11,7 +11,7 @@ from sqlalchemy import select, delete , update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
 from app.models import User, Counterparty, CargoOrder, UserRole, Port, TransportType, Equipment, Container, Company, CargoItem
-from app.auth import verify_password, create_access_token, get_current_user, hash_password 
+from app.auth import verify_password, create_access_token, get_current_user, hash_password, require_staff
 from app.schemas import Token, UserLogin, CounterpartyCreate, CounterpartyRead, OrderRead, UserCreate
 from fastapi.templating import Jinja2Templates
 
@@ -136,7 +136,7 @@ async def login_browser(
     return res
 
 
-@app.get("/api/v1/schedule/view", response_class=HTMLResponse)
+@app.get("/api/v1/schedule/view", response_class=HTMLResponse, dependencies=[Depends(get_current_user)])
 async def schedule_view(pol_id: int = None, pod_id: int = None, order_id: int = None, db: AsyncSession = Depends(get_db)):
     # Если выбраны не оба порта, ничего не показываем
     if not pol_id or not pod_id or not order_id:
@@ -298,7 +298,7 @@ async def search_counterparties(
     return HTMLResponse(content=options)
 
 
-@app.get("/api/search/address")
+@app.get("/api/search/address", dependencies=[Depends(get_current_user)])
 async def search_address(request: Request):
     #query = request.query_params.get("q", "").strip()
     #query = request.query_params.get("pre_carriage_address", "").strip()
@@ -1055,7 +1055,8 @@ async def get_order_summary(
     )
     order = result.scalars().first()
 
-    if not order:
+    # Клиент видит только свою заявку, оператор и админ — любую
+    if not order or (current_user.role == UserRole.USER and order.owner_id != current_user.id):
         raise HTTPException(status_code=404, detail="Заказ не найден")
 
     return templates.TemplateResponse(
@@ -1173,7 +1174,7 @@ async def update_seal(
     # Возвращаем "Ок" или просто обновленное значение, чтобы HTMX успокоился
     return Response(status_code=200)
 
-@app.get("/api/operator/orders/{order_id}/manage")
+@app.get("/api/operator/orders/{order_id}/manage", dependencies=[Depends(require_staff)])
 async def manage_order(order_id: int, request: Request, db: AsyncSession = Depends(get_db)):
     # Загружаем всё, включая данные по автодоставке и перевозчикам
     result = await db.execute(
@@ -1197,7 +1198,7 @@ async def manage_order(order_id: int, request: Request, db: AsyncSession = Depen
         context={"order": order, "user": getattr(request.state, "user", None)}
     )
 
-@app.post("/api/operator/orders/{order_id}/update-ops")
+@app.post("/api/operator/orders/{order_id}/update-ops", dependencies=[Depends(require_staff)])
 async def update_order_ops(
     order_id: int,
     request: Request,
@@ -1212,8 +1213,12 @@ async def update_order_ops(
     for i in range(len(ids)):
         con_id = int(ids[i])
         # Ищем конкретный контейнер
-        result = await db.execute(select(Container).where(Container.id == con_id))
-        container = result.scalar_one()
+        result = await db.execute(
+            select(Container).where(Container.id == con_id, Container.order_id == order_id)
+        )
+        container = result.scalar_one_or_none()
+        if container is None:
+            raise HTTPException(status_code=404, detail="Контейнер не найден в этой заявке")
         
         # Обновляем только если это COC (номера и пины) отключил пока
         #if not container.is_soc:
@@ -1253,7 +1258,7 @@ async def cancel_container(
     request: Request,
     reason: str = Form(None), # Получаем из hx-include
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_staff)
 ):
     res = await db.execute(select(Container).where(Container.id == container_id))
     con = res.scalars().first()
@@ -1269,7 +1274,7 @@ async def cancel_container(
     return await manage_order(request=request, order_id=con.order_id, db=db)
 
 
-@app.get("/api/operator/containers/{container_id}/cancel-form")
+@app.get("/api/operator/containers/{container_id}/cancel-form", dependencies=[Depends(require_staff)])
 async def get_cancel_form(container_id: int):
     return HTMLResponse(content=f"""
         <div class="flex flex-col gap-1">
