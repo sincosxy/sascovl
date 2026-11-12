@@ -41,6 +41,19 @@
                             <span class="text-xs italic text-slate-400">Номер не назначен</span>
                         {% endif %}
 
+                        <!-- Рейс и коносамент -->
+                        {% if con.voyage and not con.is_cancelled %}
+                            <span class="text-[11px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-2.5 py-0.5"
+                                  title="{{ con.voyage.vessel.name if con.voyage.vessel else '' }}{% if con.voyage.departure_date %}, отход {{ con.voyage.departure_date.strftime('%d.%m.%Y') }}{% endif %}">
+                                🚢 Рейс {{ con.voyage.number }}{% if con.voyage.vessel %} · {{ con.voyage.vessel.name }}{% endif %}{% if con.voyage.departure_date %} · {{ con.voyage.departure_date.strftime('%d.%m.%Y') }}{% endif %}
+                            </span>
+                            {% if con.bl_number %}
+                                <span class="text-[11px] text-slate-500">
+                                    Коносамент: <span class="font-mono font-bold text-slate-800">{{ con.bl_number }}</span>
+                                </span>
+                            {% endif %}
+                        {% endif %}
+
                         <!-- Вывод причины отмены -->
                         {% if con.is_cancelled %}
                             <span class="text-[11px] font-medium text-rose-700 bg-rose-50 border border-rose-100 rounded-lg px-2.5 py-0.5 flex items-center gap-1">

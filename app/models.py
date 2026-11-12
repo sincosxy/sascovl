@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, Enum, ForeignKey, Float, Boolean, Date, DateTime, Index, Text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, validates
+from app.helpers import validate_container_number
 from app.db import Base
 import enum
 from sqlalchemy.sql import func
@@ -199,6 +200,15 @@ class Container(Base):
     items = relationship("CargoItem", back_populates="container", cascade="all, delete-orphan")
     voyage_id = Column(Integer, ForeignKey("voyages.id"), nullable=True)
     voyage = relationship("Voyage", back_populates="containers")
+    @validates("container_number")
+    def _check_container_number(self, key, value):
+        """Срабатывает при любом присвоении номера контейнера — в любом эндпоинте.
+        Приводит номер к верхнему регистру и выставляет флаг valid_number
+        по контрольной цифре ISO 6346. Некорректный номер сохраняется, но помечается."""
+        value = value.strip().upper() if value else None
+        self.valid_number = validate_container_number(value) if value else False
+        return value
+
     # Номер коносамента, присваивается при постановке контейнера в рейс
     bl_number = Column(String, nullable=True, index=True, comment="Номер коносамента")
 
@@ -230,6 +240,18 @@ class GeneralCargoItem(Base):
     order = relationship("CargoOrder", back_populates="items")
 
 #User.orders = relationship("CargoOrder", back_populates="owner")
+
+class Notification(Base):
+    """Уведомление пользователю в личном кабинете."""
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    order_id = Column(Integer, ForeignKey("cargo_orders.id", ondelete="SET NULL"), nullable=True)
+    text = Column(Text, nullable=False)
+    is_read = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
 
 class ProcessedFile(Base):
     """Таблица для контроля уже скачанных и обработанных файлов."""

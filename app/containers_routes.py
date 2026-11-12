@@ -166,8 +166,7 @@ async def update_container(
     container.pin_code = form.get("pin_code", "").strip() or None
     container.cargo_description = form.get("cargo_description", "").strip() or None
     
-    # Сюда можно добавить вашу функцию валидации номера, если она есть
-    # container.valid_number = validate_container_number(container.container_number)
+    # valid_number выставляется автоматически в модели при присвоении container_number
 
     await db.commit()
     await db.refresh(container) # Чтобы подтянулись связанные объекты (например, order)

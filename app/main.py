@@ -10,7 +10,7 @@ from app.db import engine, Base, get_db, dadatoken
 from sqlalchemy import select, delete , update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
-from app.models import User, Counterparty, CargoOrder, UserRole, Port, TransportType, Equipment, Container, Company, CargoItem
+from app.models import User, Counterparty, CargoOrder, UserRole, Port, TransportType, Equipment, Container, Company, CargoItem, Voyage
 from app.auth import verify_password, create_access_token, get_current_user, hash_password, require_staff
 from app.schemas import Token, UserLogin, CounterpartyCreate, CounterpartyRead, OrderRead, UserCreate
 from fastapi.templating import Jinja2Templates
@@ -662,7 +662,6 @@ async def save_step_2(
             is_soc=order.is_soc,
             is_lcl=idx in is_lcl,
             container_number=numbers[i] if i < len(numbers) else None,
-            valid_number=validate_container_number(numbers[i]) if i < len(numbers) else False,
             seal=seals[i] if i < len(seals) else None,
             weight_gross=float(get_val(weights, i)) if get_val(weights, i) else 0.0,
             pieces=int(get_val(pieces, i)) if get_val(pieces, i) else 0,
@@ -1020,6 +1019,7 @@ async def get_order_details(
             select(CargoOrder)
             .options(
                 selectinload(CargoOrder.containers).selectinload(Container.equipment),
+                selectinload(CargoOrder.containers).selectinload(Container.voyage).selectinload(Voyage.vessel),
                 joinedload(CargoOrder.pre_carriage_carrier),
                 joinedload(CargoOrder.shipper),
                 joinedload(CargoOrder.consignee),
@@ -1032,6 +1032,7 @@ async def get_order_details(
             select(CargoOrder)
             .options(
                 selectinload(CargoOrder.containers).selectinload(Container.equipment),
+                selectinload(CargoOrder.containers).selectinload(Container.voyage).selectinload(Voyage.vessel),
                 joinedload(CargoOrder.pre_carriage_carrier),
                 joinedload(CargoOrder.shipper),
                 joinedload(CargoOrder.consignee),
@@ -1259,8 +1260,7 @@ async def update_order_ops(
         # Обновляем
 
         if i < len(numbers):
-            container.container_number = numbers[i]
-            container.valid_number = validate_container_number(numbers[i])
+            container.container_number = numbers[i]  # valid_number выставит модель
 
         if i < len(pins): container.pin_code = pins[i]
 

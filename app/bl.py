@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
 
-from app.models import CargoOrder, Container, Port, Voyage
+from app.models import CargoOrder, Container, Notification, Port, Voyage
 
 # (подстроки названия порта, латинская буква порта, префикс линии)
 _PORTS = (
@@ -71,6 +71,22 @@ def _next_sequence(prefix: str, pod_letter: str, existing: Iterable[Optional[str
     return max(used, default=0) + 1
 
 
+def voyage_title(voyage: Voyage) -> str:
+    """«0123 (т/х Сахалин, отход 15.11.2026)» — для текстов уведомлений."""
+    details = []
+    if voyage.vessel:
+        details.append(f"т/х {voyage.vessel.name}")
+    if voyage.departure_date:
+        details.append(f"отход {voyage.departure_date.strftime('%d.%m.%Y')}")
+    return f"{voyage.number} ({', '.join(details)})" if details else f"{voyage.number}"
+
+
+def notify_owner(db: AsyncSession, order: Optional[CargoOrder], text: str) -> None:
+    """Кладёт уведомление владельцу заявки. Сохранится вместе с ближайшим commit."""
+    if order and order.owner_id:
+        db.add(Notification(user_id=order.owner_id, order_id=order.id, text=text))
+
+
 def missing_for_voyage(con: Container) -> list[str]:
     """Чего не хватает контейнеру для постановки в рейс: нужны номер и пломба."""
     missing = []
@@ -101,6 +117,7 @@ async def assign_containers_to_voyage(
         .options(
             joinedload(Voyage.departure_port),
             joinedload(Voyage.destination_port),
+            joinedload(Voyage.vessel),
         )
         .where(Voyage.id == voyage_id)
     )
@@ -167,6 +184,11 @@ async def assign_containers_to_voyage(
                 if bl_mode == BL_MODE_PER_ORDER:
                     order_bl[con.order_id] = con.bl_number
         report["assigned"] += 1
+        notify_owner(
+            db, order,
+            f"Контейнер {label} по вашей заявке №{order.id} назначен на рейс {voyage_title(voyage)}. "
+            + (f"Номер коносамента: {con.bl_number}." if con.bl_number else "Номер коносамента будет присвоен позже.")
+        )
 
     if route_mismatch:
         report["warnings"].append(
@@ -179,11 +201,20 @@ async def assign_containers_to_voyage(
 
 async def remove_container_from_voyage(db: AsyncSession, voyage_id: int, container_id: int) -> bool:
     result = await db.execute(
-        select(Container).where(Container.id == container_id, Container.voyage_id == voyage_id)
+        select(Container)
+        .options(joinedload(Container.order), joinedload(Container.voyage))
+        .where(Container.id == container_id, Container.voyage_id == voyage_id)
     )
     con = result.scalars().first()
     if not con:
         return False
+    label = (con.container_number or "").strip() or f"ID {con.id}"
+    if con.order:
+        notify_owner(
+            db, con.order,
+            f"Контейнер {label} по вашей заявке №{con.order.id} снят с рейса {con.voyage.number}. "
+            "О новом рейсе сообщим дополнительно."
+        )
     con.voyage_id = None
     con.bl_number = None
     await db.commit()

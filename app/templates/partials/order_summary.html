@@ -68,7 +68,7 @@
                         {% if order.pre_carriage_required %}
                             <p>🚚 Доставка силами СМП Владивосток</p>
                             <p class="text-gray-600 text-xs">{{ order.pre_carriage_address }}</p>
-                            <b> {{ order.pre_carriage_date.strftime('%d.%m.%Y %H:%M')}}</b>
+                            <b> {{ order.pre_carriage_date.strftime('%d.%m.%Y %H:%M') if order.pre_carriage_date else 'Дата не указана' }}</b>
                         {% else %}
                             <p>🏢 Свой вывоз (Перевозчик клиента)</p>
                             <p class="font-medium text-orange-600">{{ order.pre_carriage_carrier.name or 'Не указан' }}</p>
