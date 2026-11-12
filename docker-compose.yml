@@ -33,9 +33,11 @@ services:
       - .env
 
   pgadmin:
+    # Только по запросу: docker compose --profile tools up -d
+    profiles: ["tools"]
     image: dpage/pgadmin4
     container_name: cargoflow_pgadmin
-    restart: always
+    restart: unless-stopped
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}

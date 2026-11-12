@@ -47,6 +47,17 @@ app = FastAPI(title="CargoFlow API")#, dependencies=[Depends(verify_auth_cookie)
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
+
+
+def ensure_editable(order: CargoOrder) -> None:
+    """Клиент может менять заявку только пока она черновик и не отменена."""
+    if order.status != "draft" or not order.is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Заявка уже отправлена и недоступна для изменения"
+        )
+
+
 app.include_router(voyages_router)
 app.include_router(containers_router)
 app.include_router(customer_router)
@@ -127,17 +138,29 @@ async def login_browser(
             )
         
     token = create_access_token(data={"sub": user.email, "role": user.role.value})
+    # Secure-флаг ставим, когда запрос пришёл по HTTPS (напрямую или через reverse proxy)
+    is_https = (
+        request.url.scheme == "https"
+        or request.headers.get("x-forwarded-proto", "").split(",")[0].strip() == "https"
+    )
     if is_htmx:
         res = Response()
         res.headers["HX-Redirect"] = "/" # Это заставит браузер перейти на главную
     else:
         res = JSONResponse(content={"access_token": token, "token_type": "bearer"})
-    res.set_cookie(key="access_token", value=token, httponly=True)
+    res.set_cookie(
+        key="access_token",
+        value=token,
+        httponly=True,
+        secure=is_https,
+        samesite="lax",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
     return res
 
 
-@app.get("/api/v1/schedule/view", response_class=HTMLResponse, dependencies=[Depends(get_current_user)])
-async def schedule_view(pol_id: int = None, pod_id: int = None, order_id: int = None, db: AsyncSession = Depends(get_db)):
+@app.get("/api/v1/schedule/view", response_class=HTMLResponse)
+async def schedule_view(pol_id: int = None, pod_id: int = None, order_id: int = None, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     # Если выбраны не оба порта, ничего не показываем
     if not pol_id or not pod_id or not order_id:
         return ""
@@ -147,7 +170,12 @@ async def schedule_view(pol_id: int = None, pod_id: int = None, order_id: int = 
     port_from = result.scalar_one_or_none()
     result = await db.execute(select(Port).where(Port.id == pod_id))
     port_to = result.scalar_one_or_none()
-    result_order = await db.execute(select(CargoOrder).where(CargoOrder.id == order_id))
+    if not port_from or not port_to:
+        return ""
+    order_query = select(CargoOrder).where(CargoOrder.id == order_id)
+    if current_user.role == UserRole.USER:
+        order_query = order_query.where(CargoOrder.owner_id == current_user.id)
+    result_order = await db.execute(order_query)
     order = result_order.scalar_one_or_none()
     # 2. Вызываем FESCO API
     if not order or not order.loading_date:
@@ -522,6 +550,7 @@ async def save_step_1(
     order = result.scalars().first()
     if not order:
         raise HTTPException(status_code=404)
+    ensure_editable(order)
 
     # Записываем данные
     order.pol_id = pol_id
@@ -601,6 +630,7 @@ async def save_step_2(
     order = result.scalars().first()
     if not order:
         raise HTTPException(status_code=404)
+    ensure_editable(order)
 
     # Удаляем старые контейнеры и сбрасываем кэш
     await db.execute(delete(Container).where(Container.order_id == order_id))
@@ -741,6 +771,7 @@ async def save_step_3(
     order = result.scalars().first()
     if not order:
         raise HTTPException(status_code=404, detail="Заказ не найден")
+    ensure_editable(order)
 
     # --- СИНХРОНИЗАЦИЯ КОНТРАГЕНТОВ (Твои функции поиска/создания) ---
     order.shipper_id = await sync_counterparty(
@@ -883,7 +914,9 @@ async def add_container_row(request: Request, order_id: int, index: int = 0, db:
     # Теперь index берется из JS-параметра кнопки
     eq_res = await db.execute(select(Equipment))
     equipments = eq_res.scalars().all()
-    order_res = await db.execute(select(CargoOrder).where(CargoOrder.id == order_id))
+    order_res = await db.execute(
+        select(CargoOrder).where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
+    )
     order = order_res.scalars().first()
     if not order:
         raise HTTPException(status_code=404)
@@ -937,6 +970,16 @@ async def delete_order(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # 0. Убеждаемся, что заказ принадлежит пользователю — до любых удалений
+    owned = await db.execute(
+        select(CargoOrder.id).where(
+            CargoOrder.id == order_id,
+            CargoOrder.owner_id == current_user.id
+        )
+    )
+    if owned.scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+
     # 1. Сначала удаляем связанные контейнеры
     result = await db.execute(
         delete(Container).where(Container.order_id == order_id)
@@ -1101,6 +1144,7 @@ async def confirm_order(
 
     if not order:
         raise HTTPException(status_code=404, detail="Заказ не найден")
+    ensure_editable(order)
 
     # Меняем статус
     order.status = "CONFIRMED"
@@ -1318,6 +1362,10 @@ async def generate_pdf(
         .where(CargoOrder.id == order_id)
     )
     order = result.scalars().first()
+
+    # Клиент скачивает только свою заявку, оператор и админ — любую
+    if not order or (current_user.role == UserRole.USER and order.owner_id != current_user.id):
+        raise HTTPException(status_code=404, detail="Заказ не найден")
 
     # 2. Рендерим HTML через Jinja
     html_content = templates.get_template("pdf/booking_note.html").render({"order": order})

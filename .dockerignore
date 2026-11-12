@@ -1,0 +1,11 @@
+.env
+.git
+.gitignore
+venv/
+__pycache__/
+*.pyc
+.vscode/
+*:Zone.Identifier
+docker-compose*.yml
+Dockerfile
+.dockerignore
