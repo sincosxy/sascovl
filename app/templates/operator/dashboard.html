@@ -1,3 +1,7 @@
+{# Новые — подтверждены клиентом, ещё не взяты оператором в работу и не отменены #}
+{% set new_orders = orders | selectattr('status', 'equalto', 'CONFIRMED') | selectattr('is_valid') | list %}
+{% set new_ids = new_orders | map(attribute='id') | list %}
+{% set other_orders = orders | rejectattr('id', 'in', new_ids) | list %}
 <div class="max-w-7xl mx-auto p-6 font-sans">
     <!-- Шапка панели -->
     <div class="flex justify-between items-center mb-6">
@@ -5,7 +9,7 @@
         <div class="flex gap-4">
             <span class="bg-indigo-50 text-indigo-700 font-semibold px-3 py-1 rounded-full text-xs border border-indigo-100 flex items-center gap-1.5">
                 <span class="w-1.5 h-1.5 bg-indigo-600 rounded-full"></span>
-                Новых заявок: {{ orders|length }}
+                Новых заявок: {{ new_orders|length }}
             </span>
         </div>
     </div>
@@ -24,8 +28,26 @@
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-                {% for order in orders %}
-                <tr class="hover:bg-slate-50/70 transition-colors duration-200">
+                {% for group_title, group_orders, is_new in [
+                    ('Новые заявки — ждут обработки', new_orders, true),
+                    ('В работе и остальные', other_orders, false)
+                ] %}
+                <!-- Заголовок блока -->
+                <tr class="{{ 'bg-blue-50' if is_new else 'bg-slate-100' }}">
+                    <td colspan="5" class="px-4 py-2.5 text-xs font-bold uppercase tracking-wider {{ 'text-blue-800' if is_new else 'text-slate-600' }}">
+                        {{ group_title }}
+                        <span class="ml-2 px-2 py-0.5 rounded-full text-[11px] {{ 'bg-blue-600 text-white' if is_new else 'bg-slate-300 text-slate-700' }}">{{ group_orders|length }}</span>
+                    </td>
+                </tr>
+                {% if not group_orders %}
+                <tr>
+                    <td colspan="5" class="px-4 py-5 text-center text-sm text-slate-400">
+                        {{ 'Новых заявок нет — всё обработано' if is_new else 'Заявок нет' }}
+                    </td>
+                </tr>
+                {% endif %}
+                {% for order in group_orders %}
+                <tr class="hover:bg-slate-50/70 transition-colors duration-200 {{ 'border-l-4 border-l-blue-500' if is_new }}">
                     <!-- Заказ -->
                     <td class="p-4 whitespace-nowrap align-middle">
                         <div class="flex items-center gap-3">
@@ -147,6 +169,7 @@
                         </div>
                     </td>
                 </tr>
+                {% endfor %}
                 {% endfor %}
             </tbody>
         </table>

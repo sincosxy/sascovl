@@ -44,6 +44,7 @@
                 </svg>
                 <span id="notif-badge"
                       hx-get="/api/notifications/badge"
+                      hx-target="this"
                       hx-trigger="load, every 60s, notificationsRead from:body"
                       hx-swap="innerHTML"></span>
             </button>
