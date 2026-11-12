@@ -21,6 +21,7 @@ import httpx, html
 from xhtml2pdf import pisa
 from io import BytesIO
 
+from app.bl import notify_owner
 from app.config import settings
 fit = settings.FIT
 
@@ -1268,6 +1269,9 @@ async def update_order_ops(
     if action == "confirm":
         result = await db.execute(select(CargoOrder).where(CargoOrder.id == order_id))
         order = result.scalar_one()
+        # Уведомляем клиента один раз — при первом утверждении, а не при каждом пересохранении
+        if order.status != "IN_PROGRESS":
+            notify_owner(db, order, f"Ваша заявка №{order.id} утверждена оператором и принята в работу.")
         order.status = "IN_PROGRESS"
 
     await db.commit()
