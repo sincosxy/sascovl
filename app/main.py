@@ -964,39 +964,6 @@ async def list_orders(
 
 
 
-@app.delete("/api/orders/{order_id}")
-async def delete_order(
-    order_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    # 0. Убеждаемся, что заказ принадлежит пользователю — до любых удалений
-    owned = await db.execute(
-        select(CargoOrder.id).where(
-            CargoOrder.id == order_id,
-            CargoOrder.owner_id == current_user.id
-        )
-    )
-    if owned.scalar_one_or_none() is None:
-        raise HTTPException(status_code=404, detail="Заказ не найден")
-
-    # 1. Сначала удаляем связанные контейнеры
-    result = await db.execute(
-        delete(Container).where(Container.order_id == order_id)
-    )
-    
-    # 2. Теперь удаляем сам заказ
-    result = await db.execute(
-        delete(CargoOrder).where(
-            CargoOrder.id == order_id, 
-            CargoOrder.owner_id == current_user.id
-        )
-    )
-    
-    await db.commit()
-    return HTMLResponse(status_code=200, content="")
-
-
 @app.post("/api/orders/{order_id}/cancel")
 async def cancel_order(
     order_id: int,

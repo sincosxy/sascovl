@@ -95,7 +95,9 @@
                             <!-- Блок тегов и статусов -->
                             <div class="flex flex-col gap-1 min-w-0">
                                 <div class="flex flex-wrap gap-1">
-                                    {% if order.status == 'CONFIRMED' %}
+                                    {% if not order.is_valid %}
+                                        <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-red-50 text-red-700 border border-red-200">✖ Отменён клиентом</span>
+                                    {% elif order.status == 'CONFIRMED' %}
                                         <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-blue-50 text-blue-700 border border-blue-100">Новая заявка</span>
                                     {% elif order.status == 'IN_PROGRESS' %}
                                         <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-50 text-emerald-700 border border-emerald-100">В работе</span>
@@ -109,7 +111,7 @@
                                 </div>
                                 
                                 {% set needs_containers = order.containers | selectattr('is_soc', 'equalto', false) | list %}
-                                {% if needs_containers and not order.containers[0].container_number %}
+                                {% if order.is_valid and needs_containers and not order.containers[0].container_number %}
                                     <span class="text-[10px] px-2 py-0.5 bg-rose-50 text-rose-600 rounded border border-rose-100 animate-pulse w-fit font-semibold">
                                         ⚠️ Назначить COC
                                     </span>
