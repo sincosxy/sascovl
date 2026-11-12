@@ -28,7 +28,7 @@ templates = Jinja2Templates(directory="app/templates")
 templates.env.filters["vlad_time"] = format_vladivostok_time
 
 from app.bl import (
-    missing_for_voyage, assign_containers_to_voyage, remove_container_from_voyage, bl_prefix,
+    missing_for_voyage, assign_containers_to_voyage, sync_order_status, remove_container_from_voyage, bl_prefix,
     BL_MODE_PER_CONTAINER, BL_MODE_PER_ORDER,
 )
 
@@ -427,11 +427,16 @@ async def delete_voyage(voyage_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Рейс не найден")
     
     # Контейнеры рейса возвращаем в активные: снимаем рейс и номер коносамента
+    affected = await db.execute(
+        select(Container.order_id).where(Container.voyage_id == voyage_id).distinct()
+    )
+    affected_order_ids = [row[0] for row in affected.all()]
     await db.execute(
         update(Container)
         .where(Container.voyage_id == voyage_id)
         .values(voyage_id=None, bl_number=None)
     )
+    await sync_order_status(db, affected_order_ids)
 
     # Удаляем и фиксируем
     await db.delete(voyage)

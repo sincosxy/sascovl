@@ -121,6 +121,8 @@
                                         <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-red-50 text-red-700 border border-red-200">✖ Отменён клиентом</span>
                                     {% elif order.status == 'CONFIRMED' %}
                                         <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-blue-50 text-blue-700 border border-blue-100">Новая заявка</span>
+                                    {% elif order.status == 'EXECUTING' %}
+                                        <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-indigo-50 text-indigo-700 border border-indigo-100">Выполняется</span>
                                     {% elif order.status == 'IN_PROGRESS' %}
                                         <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-50 text-emerald-700 border border-emerald-100">В работе</span>
                                     {% endif %}

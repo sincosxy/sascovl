@@ -24,6 +24,9 @@ _PORTS = (
     (("петропавловск", "petropavlovsk"), "P", "Пет"),
 )
 
+STATUS_IN_PROGRESS = "IN_PROGRESS"   # «В работе»: утверждена оператором
+STATUS_EXECUTING = "EXECUTING"       # «Выполняется»: все контейнеры распланированы по рейсам
+
 BL_MODE_PER_CONTAINER = "per_container"
 BL_MODE_PER_ORDER = "per_order"
 
@@ -69,6 +72,45 @@ def _next_sequence(prefix: str, pod_letter: str, existing: Iterable[Optional[str
     pattern = re.compile(rf"^{re.escape(prefix)}(\d{{3,}}){re.escape(pod_letter)}$")
     used = [int(m.group(1)) for bl in existing if bl and (m := pattern.match(bl))]
     return max(used, default=0) + 1
+
+
+async def sync_order_status(db: AsyncSession, order_ids: Iterable[Optional[int]]) -> None:
+    """Переключает заявку между «В работе» и «Выполняется».
+
+    «Выполняется» — когда у заявки есть хотя бы один неотменённый контейнер и все
+    неотменённые контейнеры стоят в рейсах. Если условие перестало выполняться
+    (контейнер сняли с рейса, восстановили отменённый) — обратно «В работе».
+    Другие статусы (черновик, новая заявка) не трогает. Вызывать до commit.
+    """
+    ids = {i for i in order_ids if i}
+    if not ids:
+        return
+    await db.flush()  # у сессии autoflush выключен — без этого запрос не увидит свежие изменения
+
+    result = await db.execute(
+        select(CargoOrder).where(
+            CargoOrder.id.in_(ids),
+            CargoOrder.status.in_([STATUS_IN_PROGRESS, STATUS_EXECUTING]),
+        )
+    )
+    orders = result.scalars().all()
+    if not orders:
+        return
+
+    result = await db.execute(
+        select(Container.order_id, Container.voyage_id).where(
+            Container.order_id.in_([o.id for o in orders]),
+            Container.is_cancelled.isnot(True),
+        )
+    )
+    active: dict[int, list] = {}
+    for order_id, voyage_id in result.all():
+        active.setdefault(order_id, []).append(voyage_id)
+
+    for order in orders:
+        voyages = active.get(order.id, [])
+        all_planned = bool(voyages) and all(v is not None for v in voyages)
+        order.status = STATUS_EXECUTING if all_planned else STATUS_IN_PROGRESS
 
 
 def voyage_title(voyage: Voyage) -> str:
@@ -195,6 +237,7 @@ async def assign_containers_to_voyage(
             f"У {route_mismatch} конт. маршрут заявки не совпадает с маршрутом рейса — проверьте."
         )
 
+    await sync_order_status(db, {con.order_id for con in containers if con.voyage_id == voyage.id})
     await db.commit()
     return report
 
@@ -217,5 +260,6 @@ async def remove_container_from_voyage(db: AsyncSession, voyage_id: int, contain
         )
     con.voyage_id = None
     con.bl_number = None
+    await sync_order_status(db, [con.order_id])
     await db.commit()
     return True

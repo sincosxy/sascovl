@@ -23,7 +23,7 @@ router = APIRouter(
     dependencies=[Depends(require_staff)],
     tags=["containers"]
 )
-from app.bl import missing_for_voyage, assign_containers_to_voyage, BL_MODE_PER_CONTAINER, BL_MODE_PER_ORDER
+from app.bl import missing_for_voyage, assign_containers_to_voyage, sync_order_status, BL_MODE_PER_CONTAINER, BL_MODE_PER_ORDER
 
 templates = Jinja2Templates(directory="app/templates")
 templates.env.globals["missing_for_voyage"] = missing_for_voyage
@@ -228,6 +228,7 @@ async def cancel_container(
     container.cancelled_at = datetime.utcnow()
     # container.cancelled_by_id = current_user.id # Если есть авторизация
     
+    await sync_order_status(db, [container.order_id])
     await db.commit()
     await db.refresh(container)
     
@@ -269,6 +270,7 @@ async def restore_container(
     container.cancelled_by_id = None
     
     # 3. Сохраняем в PostgreSQL
+    await sync_order_status(db, [container.order_id])
     await db.commit()
     
     # 4. Возвращаем ожившую строку таблицы обратно в HTMX

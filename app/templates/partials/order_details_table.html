@@ -68,7 +68,7 @@
                     <!-- Правая часть: Настройки, Пломба, ПИН -->
                     <div class="flex items-center justify-end gap-4 shrink-0 {% if con.is_cancelled %}pointer-events-none select-none opacity-50{% endif %}">
                         <!-- ПИН-код -->
-                        {% if con.pin_code and order.status == 'IN_PROGRESS' and not con.is_cancelled %}
+                        {% if con.pin_code and order.status in ('IN_PROGRESS', 'EXECUTING') and not con.is_cancelled %}
                             <span class="bg-amber-50 text-amber-700 px-2 py-1 rounded-md text-[10px] font-bold border border-amber-200 tracking-wide">
                                 PIN: {{ con.pin_code }}
                             </span>

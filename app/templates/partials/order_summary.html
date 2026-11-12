@@ -134,6 +134,17 @@
                             <span class="block md:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider font-sans">Номер</span>
                             <div class="text-right md:text-left {{ 'text-rose-600 font-bold' if con.valid_number == False else 'text-slate-700' }}">
                                 {{ con.container_number or 'Назначается' }}
+                                {# Рейс и коносамент — появляются после постановки контейнера в рейс #}
+                                {% if con.voyage_id and con.voyage and not con.is_cancelled %}
+                                    <div class="mt-1 font-sans text-[11px] font-medium text-indigo-700">
+                                        🚢 Рейс {{ con.voyage.number }}{% if con.voyage.vessel %} · {{ con.voyage.vessel.name }}{% endif %}{% if con.voyage.departure_date %} · {{ con.voyage.departure_date.strftime('%d.%m.%Y') }}{% endif %}
+                                    </div>
+                                    {% if con.bl_number %}
+                                        <div class="font-sans text-[11px] text-slate-500">
+                                            Коносамент: <span class="font-mono font-bold text-slate-800">{{ con.bl_number }}</span>
+                                        </div>
+                                    {% endif %}
+                                {% endif %}
                             </div>
                         </td>
                         

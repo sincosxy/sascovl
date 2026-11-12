@@ -21,7 +21,7 @@ import httpx, html
 from xhtml2pdf import pisa
 from io import BytesIO
 
-from app.bl import notify_owner
+from app.bl import notify_owner, sync_order_status, STATUS_IN_PROGRESS, STATUS_EXECUTING
 from app.config import settings
 fit = settings.FIT
 
@@ -845,7 +845,8 @@ async def save_step_3(
             joinedload(CargoOrder.pre_carriage_carrier),
             selectinload(CargoOrder.containers).options(
                 selectinload(Container.items),
-                selectinload(Container.equipment)
+                selectinload(Container.equipment),
+                selectinload(Container.voyage).selectinload(Voyage.vessel)
             )
         )
         .where(CargoOrder.id == order_id)
@@ -883,7 +884,8 @@ async def get_step_4(
             # Вытягиваем контейнеры, а внутри них — грузы и типы оборудования
             selectinload(CargoOrder.containers).options(
                 selectinload(Container.items),
-                selectinload(Container.equipment)
+                selectinload(Container.equipment),
+                selectinload(Container.voyage).selectinload(Voyage.vessel)
             )
         )
         .where(
@@ -1064,7 +1066,8 @@ async def get_order_summary(
             # Подгружаем всё дерево связей для финала
             selectinload(CargoOrder.containers).options(
                 selectinload(Container.items),
-                selectinload(Container.equipment)
+                selectinload(Container.equipment),
+                selectinload(Container.voyage).selectinload(Voyage.vessel)
             ),
             selectinload(CargoOrder.port_of_loading),
             selectinload(CargoOrder.port_of_discharge),
@@ -1270,9 +1273,11 @@ async def update_order_ops(
         result = await db.execute(select(CargoOrder).where(CargoOrder.id == order_id))
         order = result.scalar_one()
         # Уведомляем клиента один раз — при первом утверждении, а не при каждом пересохранении
-        if order.status != "IN_PROGRESS":
+        if order.status not in (STATUS_IN_PROGRESS, STATUS_EXECUTING):
             notify_owner(db, order, f"Ваша заявка №{order.id} утверждена оператором и принята в работу.")
-        order.status = "IN_PROGRESS"
+            order.status = STATUS_IN_PROGRESS
+        # Если все контейнеры уже распланированы по рейсам — сразу «Выполняется»
+        await sync_order_status(db, [order.id])
 
     await db.commit()
     
@@ -1298,6 +1303,7 @@ async def cancel_container(
         con.cancel_reason = reason
         con.cancelled_at = datetime.now()
         con.cancelled_by_id = current_user.id
+        await sync_order_status(db, [con.order_id])
         await db.commit()
     
     # Перерисовываем всю страницу, как и раньше
