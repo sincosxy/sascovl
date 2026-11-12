@@ -27,6 +27,13 @@ templates = Jinja2Templates(directory="app/templates")
 
 templates.env.filters["vlad_time"] = format_vladivostok_time
 
+from app.bl import (
+    missing_for_voyage, assign_containers_to_voyage, remove_container_from_voyage, bl_prefix,
+    BL_MODE_PER_CONTAINER, BL_MODE_PER_ORDER,
+)
+
+templates.env.globals["missing_for_voyage"] = missing_for_voyage
+
 router = APIRouter(prefix="/voyages", dependencies=[Depends(require_staff)], redirect_slashes=False, tags=["Operator Voyages"])
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
@@ -419,9 +426,162 @@ async def delete_voyage(voyage_id: int, db: AsyncSession = Depends(get_db)):
     if not voyage:
         raise HTTPException(status_code=404, detail="Рейс не найден")
     
+    # Контейнеры рейса возвращаем в активные: снимаем рейс и номер коносамента
+    await db.execute(
+        update(Container)
+        .where(Container.voyage_id == voyage_id)
+        .values(voyage_id=None, bl_number=None)
+    )
+
     # Удаляем и фиксируем
     await db.delete(voyage)
     await db.commit()
     
     # HTMX ожидает пустой ответ или статус 200, чтобы удалить hx-target элемент из DOM
     return HTMLResponse(content="", status_code=status.HTTP_200_OK)
+
+
+# --- 4. СОСТАВ РЕЙСА: КОНТЕЙНЕРЫ И КОНОСАМЕНТЫ ---
+async def render_voyage_containers(
+    request: Request,
+    voyage_id: int,
+    db: AsyncSession,
+    show_all: bool = False,
+    report: Optional[dict] = None,
+):
+    """Страница рейса: контейнеры в рейсе + активные контейнеры, которые можно в него поставить."""
+    db.expire_all()
+    result = await db.execute(
+        select(Voyage)
+        .options(
+            selectinload(Voyage.vessel),
+            selectinload(Voyage.departure_port),
+            selectinload(Voyage.destination_port),
+        )
+        .where(Voyage.id == voyage_id)
+    )
+    voyage = result.scalar_one_or_none()
+    if not voyage:
+        raise HTTPException(status_code=404, detail="Рейс не найден")
+
+    container_options = (
+        joinedload(Container.equipment),
+        joinedload(Container.order).options(
+            joinedload(CargoOrder.owner).joinedload(User.company),
+            joinedload(CargoOrder.port_of_loading),
+            joinedload(CargoOrder.port_of_discharge),
+            joinedload(CargoOrder.shipper),
+            joinedload(CargoOrder.consignee),
+        ),
+    )
+
+    result = await db.execute(
+        select(Container)
+        .options(*container_options)
+        .where(Container.voyage_id == voyage_id)
+        .order_by(Container.bl_number, Container.id)
+    )
+    loaded = result.scalars().all()
+
+    # Свободные контейнеры: не отменены, не в рейсе, заявка подтверждена и не отменена
+    available_query = (
+        select(Container)
+        .join(CargoOrder, Container.order_id == CargoOrder.id)
+        .options(*container_options)
+        .where(
+            Container.voyage_id.is_(None),
+            Container.is_cancelled.isnot(True),
+            CargoOrder.is_valid == True,
+            CargoOrder.status != "draft",
+        )
+        .order_by(Container.order_id, Container.id)
+    )
+    if not show_all:
+        available_query = available_query.where(
+            CargoOrder.pol_id == voyage.departure_port_id,
+            CargoOrder.pod_id == voyage.destination_port_id,
+        )
+    result = await db.execute(available_query)
+    available = result.scalars().all()
+
+    prefix, pod_letter, prefix_error = bl_prefix(voyage)
+
+    return templates.TemplateResponse(
+        name="voyages/voyage_containers.html",
+        request=request,
+        context={
+            "voyage": voyage,
+            "loaded": loaded,
+            "available": available,
+            "show_all": show_all,
+            "report": report,
+            "bl_example": f"{prefix}001{pod_letter}" if prefix else None,
+            "bl_error": prefix_error,
+        },
+    )
+
+
+@router.get("/{voyage_id}/containers", response_class=HTMLResponse)
+async def voyage_containers(
+    request: Request,
+    voyage_id: int,
+    show_all: bool = False,
+    db: AsyncSession = Depends(get_db),
+):
+    return await render_voyage_containers(request, voyage_id, db, show_all=show_all)
+
+
+@router.post("/{voyage_id}/containers", response_class=HTMLResponse)
+async def add_containers_to_voyage(
+    request: Request,
+    voyage_id: int,
+    container_ids: list[int] = Form([]),
+    bl_mode: str = Form(BL_MODE_PER_CONTAINER),
+    show_all: bool = Form(False),
+    db: AsyncSession = Depends(get_db),
+):
+    """Групповая постановка выбранных контейнеров в рейс с выдачей номеров коносаментов."""
+    if bl_mode not in (BL_MODE_PER_CONTAINER, BL_MODE_PER_ORDER):
+        bl_mode = BL_MODE_PER_CONTAINER
+    report = await assign_containers_to_voyage(db, voyage_id, container_ids, bl_mode)
+    return await render_voyage_containers(request, voyage_id, db, show_all=show_all, report=report)
+
+
+@router.post("/{voyage_id}/containers/remove", response_class=HTMLResponse)
+async def remove_containers_from_voyage(
+    request: Request,
+    voyage_id: int,
+    container_ids: list[int] = Form([]),
+    show_all: bool = Form(False),
+    db: AsyncSession = Depends(get_db),
+):
+    """Снимает контейнеры с рейса: они возвращаются в активные, номер коносамента сбрасывается."""
+    removed = 0
+    for container_id in container_ids:
+        if await remove_container_from_voyage(db, voyage_id, container_id):
+            removed += 1
+    report = {"assigned": 0, "removed": removed, "skipped": [], "warnings": [], "error": None}
+    if not removed:
+        report["error"] = "Не выбрано ни одного контейнера"
+    return await render_voyage_containers(request, voyage_id, db, show_all=show_all, report=report)
+
+
+@router.post("/{voyage_id}/containers/{container_id}/bl", response_class=HTMLResponse)
+async def set_container_bl(
+    request: Request,
+    voyage_id: int,
+    container_id: int,
+    bl_number: str = Form(""),
+    show_all: bool = Form(False),
+    db: AsyncSession = Depends(get_db),
+):
+    """Ручная правка номера коносамента у контейнера в рейсе."""
+    result = await db.execute(
+        select(Container).where(Container.id == container_id, Container.voyage_id == voyage_id)
+    )
+    container = result.scalars().first()
+    if not container:
+        raise HTTPException(status_code=404, detail="Контейнер не найден в этом рейсе")
+    container.bl_number = bl_number.strip() or None
+    await db.commit()
+    return await render_voyage_containers(request, voyage_id, db, show_all=show_all)

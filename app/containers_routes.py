@@ -23,11 +23,71 @@ router = APIRouter(
     dependencies=[Depends(require_staff)],
     tags=["containers"]
 )
+from app.bl import missing_for_voyage, assign_containers_to_voyage, BL_MODE_PER_CONTAINER, BL_MODE_PER_ORDER
+
 templates = Jinja2Templates(directory="app/templates")
+templates.env.globals["missing_for_voyage"] = missing_for_voyage
+
+CONTAINER_VIEWS = ("active", "planned", "cancelled", "all")
+
+
+async def render_containers_list(
+    request: Request,
+    db: AsyncSession,
+    view: str = "active",
+    report: Optional[dict] = None,
+):
+    """Список контейнеров. view: active — свободные (не в рейсе), planned — распланированные,
+    cancelled — отменённые, all — все."""
+    if view not in CONTAINER_VIEWS:
+        view = "active"
+    db.expire_all()
+
+    query = (
+        select(Container)
+            .options(
+                joinedload(Container.equipment),
+                joinedload(Container.voyage),
+                joinedload(Container.order)
+                    .joinedload(CargoOrder.owner)
+                    .joinedload(User.company)
+            )
+            .order_by(Container.id.desc())
+    )
+    if view == "active":
+        query = query.where(Container.voyage_id.is_(None), Container.is_cancelled.isnot(True))
+    elif view == "planned":
+        query = query.where(Container.voyage_id.isnot(None), Container.is_cancelled.isnot(True))
+    elif view == "cancelled":
+        query = query.where(Container.is_cancelled == True)
+
+    result = await db.execute(query)
+    containers = result.scalars().all()
+
+    # Рейсы для группового переноса: предстоящие и недавно ушедшие
+    voyages_result = await db.execute(
+        select(Voyage)
+        .options(
+            selectinload(Voyage.vessel),
+            selectinload(Voyage.departure_port),
+            selectinload(Voyage.destination_port),
+        )
+        .where(or_(Voyage.departure_date.is_(None), Voyage.departure_date >= date.today() - timedelta(days=14)))
+        .order_by(Voyage.departure_date)
+    )
+    voyages = voyages_result.scalars().all()
+
+    return templates.TemplateResponse(
+        name="containers/containers_list.html",
+        request=request,
+        context={"containers": containers, "view": view, "voyages": voyages, "report": report},
+    )
+
 
 @router.get("/", response_class=HTMLResponse)
 async def list_containers(
-    request: Request, 
+    request: Request,
+    view: str = "active",
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -35,25 +95,30 @@ async def list_containers(
     Если запрос от HTMX (hx-request), отдаем только кусок таблицы.
     Если обычный — полную страницу.
     """
-    # Загружаем контейнеры вместе со связанным типом оборудования (equipment)
-    query = (
-        select(Container)
-            .options(
-                joinedload(Container.equipment),
-                joinedload(Container.order)
-                    .joinedload(CargoOrder.owner)
-                    .joinedload(User.company)
-            )
-            .order_by(Container.id.desc())
-    )    
-    result = await db.execute(query)
-    containers = result.scalars().all()
-
     # Проверяем заголовок HTMX
     if request.headers.get("HX-Request"):
-        return templates.TemplateResponse(name="containers/containers_list.html", request=request, context={"containers": containers})
-        
+        return await render_containers_list(request, db, view=view)
+
     return templates.TemplateResponse(name="containers/containers_page.html", request=request, context={})
+
+
+@router.post("/assign-voyage", response_class=HTMLResponse)
+async def assign_voyage(
+    request: Request,
+    voyage_id: Optional[int] = Form(None),
+    container_ids: list[int] = Form([]),
+    bl_mode: str = Form(BL_MODE_PER_CONTAINER),
+    view: str = Form("active"),
+    db: AsyncSession = Depends(get_db)
+):
+    """Групповой перенос выбранных контейнеров в рейс с выдачей номеров коносаментов."""
+    if bl_mode not in (BL_MODE_PER_CONTAINER, BL_MODE_PER_ORDER):
+        bl_mode = BL_MODE_PER_CONTAINER
+    if not voyage_id:
+        report = {"assigned": 0, "skipped": [], "warnings": [], "error": "Выберите рейс"}
+    else:
+        report = await assign_containers_to_voyage(db, voyage_id, container_ids, bl_mode)
+    return await render_containers_list(request, db, view=view, report=report)
 
 
 @router.get("/{container_id}/edit", response_class=HTMLResponse)
@@ -110,6 +175,7 @@ async def update_container(
         select(Container)
             .options(
                 joinedload(Container.equipment),
+                joinedload(Container.voyage),
                 joinedload(Container.order)
                     .joinedload(CargoOrder.owner)
                     .joinedload(User.company)
@@ -145,6 +211,7 @@ async def cancel_container(
         .where(Container.id == container_id)
         .options(
             joinedload(Container.equipment),
+            joinedload(Container.voyage),
             joinedload(Container.order)
                 .joinedload(CargoOrder.owner)
                 .joinedload(User.company)
@@ -184,6 +251,7 @@ async def restore_container(
         .where(Container.id == container_id)
         .options(
             joinedload(Container.equipment),
+            joinedload(Container.voyage),
             joinedload(Container.order)
                 .joinedload(CargoOrder.owner)
                 .joinedload(User.company)

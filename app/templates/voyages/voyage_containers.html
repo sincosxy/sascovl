@@ -1,0 +1,201 @@
+{# Состав рейса: контейнеры в рейсе с номерами коносаментов + постановка свободных контейнеров #}
+{% macro container_cells(con) %}
+    <td class="px-3 py-2 font-mono {{ 'text-red-600 font-bold' if con.valid_number == False else 'text-gray-900' }}">
+        {{ con.container_number or '— не присвоен —' }}
+        <div class="text-[11px] font-sans font-normal text-gray-500">
+            {{ con.equipment.name if con.equipment else '' }} · {{ 'SOC' if con.is_soc else 'COC' }}
+        </div>
+    </td>
+    <td class="px-3 py-2">
+        {% if con.order %}
+            <div class="font-semibold text-gray-900">Заказ #{{ con.order.id }}</div>
+            <div class="text-[11px] text-gray-500">
+                {{ con.order.owner.company.name if con.order.owner and con.order.owner.company else '—' }}
+            </div>
+        {% endif %}
+    </td>
+    <td class="px-3 py-2 text-xs text-gray-700">
+        {% if con.order %}
+            <div><span class="text-gray-400">Отпр.:</span> {{ con.order.shipper.name if con.order.shipper else '—' }}</div>
+            <div><span class="text-gray-400">Получ.:</span> {{ con.order.consignee.name if con.order.consignee else '—' }}</div>
+        {% endif %}
+    </td>
+    <td class="px-3 py-2 text-xs">
+        {% if con.order %}
+            {% set route_ok = con.order.pol_id == voyage.departure_port_id and con.order.pod_id == voyage.destination_port_id %}
+            <span class="{{ 'text-gray-700' if route_ok else 'text-amber-700 font-semibold' }}">
+                {{ con.order.port_of_loading.name if con.order.port_of_loading else '—' }}
+                → {{ con.order.port_of_discharge.name if con.order.port_of_discharge else '—' }}
+                {% if not route_ok %}⚠️{% endif %}
+            </span>
+        {% endif %}
+    </td>
+    <td class="px-3 py-2 text-xs whitespace-nowrap {{ 'text-gray-700' if con.seal else 'text-red-600 font-semibold' }}">
+        {{ con.seal or 'нет пломбы' }}
+    </td>
+    <td class="px-3 py-2 text-xs text-gray-700 whitespace-nowrap">
+        {{ con.weight_gross or 0 }} кг · {{ con.pieces or 0 }} мест
+    </td>
+{% endmacro %}
+
+<div class="space-y-6">
+    <!-- Шапка рейса -->
+    <div class="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+        <div class="flex items-center gap-4">
+            <button hx-get="/voyages/" hx-target="#main-content" class="text-blue-600 hover:underline text-sm cursor-pointer">
+                ← К списку рейсов
+            </button>
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">
+                    Рейс {{ voyage.number }} · {{ voyage.vessel.name }}
+                </h2>
+                <div class="text-sm text-gray-500">
+                    {{ voyage.departure_port.name }} → {{ voyage.destination_port.name }}
+                    {% if voyage.departure_date %} · отход {{ voyage.departure_date.strftime('%d.%m.%Y') }}{% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="text-right text-xs text-gray-500">
+            {% if bl_example %}
+                Формат коносамента: <span class="font-mono font-bold text-gray-800">{{ bl_example }}</span>
+            {% else %}
+                <span class="text-amber-700">⚠️ Автонумерация коносаментов недоступна: {{ bl_error }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    {% include "partials/assign_report.html" %}
+
+    <!-- Контейнеры в рейсе -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-4 py-3 bg-gray-800 text-white font-bold flex items-center justify-between">
+            <span>В рейсе: {{ loaded|length }}</span>
+        </div>
+        {% if loaded %}
+        <form hx-post="/voyages/{{ voyage.id }}/containers/remove" hx-target="#main-content"
+              hx-confirm="Снять выбранные контейнеры с рейса? Номера коносаментов будут сброшены.">
+            <input type="hidden" name="show_all" value="{{ 'true' if show_all else 'false' }}">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
+                        <tr>
+                            <th class="px-3 py-2 w-8">
+                                <input type="checkbox" title="Выбрать все"
+                                       onclick="this.closest('table').querySelectorAll('tbody input[name=container_ids]').forEach(c => c.checked = this.checked)">
+                            </th>
+                            <th class="px-3 py-2">Коносамент</th>
+                            <th class="px-3 py-2">Контейнер</th>
+                            <th class="px-3 py-2">Заказ</th>
+                            <th class="px-3 py-2">Стороны</th>
+                            <th class="px-3 py-2">Маршрут заявки</th>
+                            <th class="px-3 py-2">Пломба</th>
+                            <th class="px-3 py-2">Вес / места</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        {% for con in loaded %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-3 py-2"><input type="checkbox" name="container_ids" value="{{ con.id }}"></td>
+                            <td class="px-3 py-2">
+                                <!-- Ручная правка номера: отправляется отдельным запросом по Enter или уходу с поля -->
+                                <input type="text" name="bl_number" value="{{ con.bl_number or '' }}"
+                                       placeholder="нет номера"
+                                       hx-post="/voyages/{{ voyage.id }}/containers/{{ con.id }}/bl"
+                                       hx-trigger="change"
+                                       onkeydown="if (event.key === 'Enter') { event.preventDefault(); this.blur(); }"
+                                       hx-target="#main-content"
+                                       hx-params="bl_number"
+                                       class="font-mono font-bold text-gray-900 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded px-1.5 py-1 w-40 bg-transparent focus:bg-white focus:outline-none">
+                            </td>
+                            {{ container_cells(con) }}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-4 py-3 border-t border-gray-100 flex justify-end">
+                <button type="submit" class="px-4 py-2 bg-white border border-red-300 text-red-700 hover:bg-red-50 rounded-lg text-sm font-semibold cursor-pointer transition">
+                    Снять выбранные с рейса
+                </button>
+            </div>
+        </form>
+        {% else %}
+            <div class="p-8 text-center text-gray-400 text-sm">В рейсе пока нет контейнеров</div>
+        {% endif %}
+    </div>
+
+    <!-- Свободные контейнеры -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-4 py-3 bg-slate-100 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3">
+            <span class="font-bold text-gray-800">
+                Свободные контейнеры: {{ available|length }}
+                <span class="font-normal text-sm text-gray-500">
+                    {{ '(все маршруты)' if show_all else '(по маршруту рейса)' }}
+                </span>
+            </span>
+            {% if show_all %}
+                <button hx-get="/voyages/{{ voyage.id }}/containers" hx-target="#main-content"
+                        class="text-sm text-blue-600 hover:underline cursor-pointer">Только по маршруту рейса</button>
+            {% else %}
+                <button hx-get="/voyages/{{ voyage.id }}/containers?show_all=true" hx-target="#main-content"
+                        class="text-sm text-blue-600 hover:underline cursor-pointer">Показать все маршруты</button>
+            {% endif %}
+        </div>
+        {% if available %}
+        <form hx-post="/voyages/{{ voyage.id }}/containers" hx-target="#main-content">
+            <input type="hidden" name="show_all" value="{{ 'true' if show_all else 'false' }}">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
+                        <tr>
+                            <th class="px-3 py-2 w-8">
+                                <input type="checkbox" title="Выбрать все"
+                                       onclick="this.closest('table').querySelectorAll('tbody input[name=container_ids]').forEach(c => c.checked = this.checked)">
+                            </th>
+                            <th class="px-3 py-2">Контейнер</th>
+                            <th class="px-3 py-2">Заказ</th>
+                            <th class="px-3 py-2">Стороны</th>
+                            <th class="px-3 py-2">Маршрут заявки</th>
+                            <th class="px-3 py-2">Пломба</th>
+                            <th class="px-3 py-2">Вес / места</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        {% for con in available %}
+                        {% set missing = missing_for_voyage(con) %}
+                        <tr class="hover:bg-gray-50 {{ 'opacity-60' if missing }}">
+                            <td class="px-3 py-2">
+                                {% if missing %}
+                                    <span class="cursor-help" title="Нельзя поставить в рейс: не указано — {{ missing|join(', ') }}">🚫</span>
+                                {% else %}
+                                    <input type="checkbox" name="container_ids" value="{{ con.id }}">
+                                {% endif %}
+                            </td>
+                            {{ container_cells(con) }}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-4 py-3 border-t border-gray-100 flex flex-wrap items-center justify-end gap-4">
+                <div class="flex items-center gap-4 text-sm text-gray-700">
+                    <span class="text-gray-500">Коносаменты:</span>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="radio" name="bl_mode" value="per_container" checked> отдельный на каждый контейнер
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="radio" name="bl_mode" value="per_order"> один на заявку
+                    </label>
+                </div>
+                <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold cursor-pointer transition shadow">
+                    Поставить выбранные в рейс
+                </button>
+            </div>
+        </form>
+        {% else %}
+            <div class="p-8 text-center text-gray-400 text-sm">
+                Свободных контейнеров {{ '' if show_all else 'по маршруту рейса ' }}нет
+            </div>
+        {% endif %}
+    </div>
+</div>

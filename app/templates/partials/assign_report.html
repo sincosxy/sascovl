@@ -1,0 +1,29 @@
+{# Итог групповой операции с контейнерами. Ожидает report: assigned / removed / skipped / warnings / error #}
+{% if report %}
+<div class="mb-4 space-y-2 text-sm">
+    {% if report.error %}
+        <div class="p-3 rounded-lg bg-red-50 border border-red-200 text-red-800">{{ report.error }}</div>
+    {% endif %}
+    {% if report.assigned %}
+        <div class="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800">
+            Поставлено в рейс контейнеров: <strong>{{ report.assigned }}</strong>
+        </div>
+    {% endif %}
+    {% if report.removed %}
+        <div class="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800">
+            Снято с рейса контейнеров: <strong>{{ report.removed }}</strong>
+        </div>
+    {% endif %}
+    {% for w in report.warnings %}
+        <div class="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">⚠️ {{ w }}</div>
+    {% endfor %}
+    {% if report.skipped %}
+        <div class="p-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-700">
+            <div class="font-semibold mb-1">Пропущено: {{ report.skipped|length }}</div>
+            <ul class="list-disc list-inside text-xs space-y-0.5">
+                {% for line in report.skipped %}<li>{{ line }}</li>{% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+</div>
+{% endif %}

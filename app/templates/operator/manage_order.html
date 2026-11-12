@@ -23,6 +23,11 @@
         </div>
     </div>
 
+    <!-- Блок: Отправитель / Получатель / Notify -->
+    <div class="bg-white rounded-xl shadow-md border border-gray-200 p-4">
+        {% include "partials/order_parties.html" %}
+    </div>
+
     <form hx-post="/api/operator/orders/{{ order.id }}/update-ops" hx-target="#main-content" class="space-y-6">
         <!-- Блок: Контейнеры и Оборудование -->
         <div class="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200">

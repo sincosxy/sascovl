@@ -91,6 +91,33 @@ async def operator_dashboard(
         response.headers["HX-Redirect"] = "/login" # Заставит HTMX сделать полный редирект
         return response
 
+@router.delete("/orders/{order_id}")
+async def delete_order_permanently(
+    order_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    """Полное удаление заявки оператором/админом (в т.ч. отменённой клиентом).
+    Вместе с заявкой удаляются её контейнеры и грузовые позиции."""
+    result = await db.execute(
+        select(CargoOrder)
+        .options(
+            selectinload(CargoOrder.containers).selectinload(Container.items),
+            selectinload(CargoOrder.items)
+        )
+        .where(CargoOrder.id == order_id)
+    )
+    order = result.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+
+    await db.delete(order)
+    await db.commit()
+
+    # Перерисовываем дашборд уже без удалённой заявки
+    return await operator_dashboard(request=request, db=db)
+
+
 # Получение формы
 @router.get("/edit-user-form/{user_id}", dependencies=[Depends(require_admin)])
 async def get_user_form(request: Request, user_id: int = None, db: AsyncSession = Depends(get_db)):

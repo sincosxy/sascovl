@@ -1018,13 +1018,25 @@ async def get_order_details(
     if current_user.role not in [UserRole.ADMIN, UserRole.OPERATOR]:
         result = await db.execute(
             select(CargoOrder)
-            .options(selectinload(CargoOrder.containers).selectinload(Container.equipment),joinedload(CargoOrder.pre_carriage_carrier))
+            .options(
+                selectinload(CargoOrder.containers).selectinload(Container.equipment),
+                joinedload(CargoOrder.pre_carriage_carrier),
+                joinedload(CargoOrder.shipper),
+                joinedload(CargoOrder.consignee),
+                joinedload(CargoOrder.notify_party)
+            )
             .where(CargoOrder.id == order_id, CargoOrder.owner_id == current_user.id)
         )
     else:
         result = await db.execute(
             select(CargoOrder)
-            .options(selectinload(CargoOrder.containers).selectinload(Container.equipment),joinedload(CargoOrder.pre_carriage_carrier))
+            .options(
+                selectinload(CargoOrder.containers).selectinload(Container.equipment),
+                joinedload(CargoOrder.pre_carriage_carrier),
+                joinedload(CargoOrder.shipper),
+                joinedload(CargoOrder.consignee),
+                joinedload(CargoOrder.notify_party)
+            )
             .where(CargoOrder.id == order_id) #, CargoOrder.owner_id == current_user.id)
         )
     order = result.scalars().first()
@@ -1194,6 +1206,9 @@ async def manage_order(order_id: int, request: Request, db: AsyncSession = Depen
             joinedload(CargoOrder.port_of_loading),
             joinedload(CargoOrder.port_of_discharge),
             joinedload(CargoOrder.pre_carriage_carrier),
+            joinedload(CargoOrder.shipper),
+            joinedload(CargoOrder.consignee),
+            joinedload(CargoOrder.notify_party),
             selectinload(CargoOrder.containers).options(joinedload(Container.equipment))
         )
         .where(CargoOrder.id == order_id)

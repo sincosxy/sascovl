@@ -2,6 +2,17 @@
     <!--td class="px-4 py-2 border-b font-mono {% if container.valid_number == False %}text-red-600 font-bold{% endif %}">
         {{ container.container_number or '---не присвоен---' }}
     </td-->
+    <!-- Выбор для группового переноса: только свободные (не в рейсе, не отменённые) -->
+    <td class="px-3 py-2 border-b">
+        {% if not container.is_cancelled and not container.voyage_id %}
+            {% set missing = missing_for_voyage(container) %}
+            {% if missing %}
+                <span class="cursor-help" title="Нельзя поставить в рейс: не указано — {{ missing|join(', ') }}">🚫</span>
+            {% else %}
+                <input type="checkbox" name="container_ids" value="{{ container.id }}">
+            {% endif %}
+        {% endif %}
+    </td>
     <td class="px-4 py-2 border-b font-mono {% if container.valid_number == False %}text-red-600 font-bold{% endif %}">
         <button type="button"
                 hx-get="/containers/{{ container.id }}/edit"
@@ -59,6 +70,10 @@
     <td class="px-4 py-2 border-b text-xs">
         {% if container.is_cancelled %}
             <span class="text-red-600 font-semibold" title="Причина: {{ container.cancel_reason }}">Отменен</span>
+        {% elif container.voyage_id %}
+            <span class="text-indigo-700 font-semibold">Распланирован</span>
+            <div class="text-gray-600 mt-0.5">Рейс {{ container.voyage.number if container.voyage else '' }}</div>
+            <div class="font-mono font-bold text-gray-900">{{ container.bl_number or 'без коносамента' }}</div>
         {% else %}
             <span class="text-green-600">Активен</span>
         {% endif %}

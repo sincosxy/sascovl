@@ -1,0 +1,30 @@
+{# Стороны заявки: отправитель, получатель, уведомляемая сторона.
+   Ожидает order с подгруженными shipper / consignee / notify_party. #}
+<div>
+    <h4 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">Стороны заявки</h4>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {% for title, cp in [
+            ('Отправитель', order.shipper),
+            ('Получатель', order.consignee),
+            ('Notify (уведомить)', order.notify_party)
+        ] %}
+        <div class="bg-white rounded-xl border border-slate-200/60 p-4 shadow-sm text-xs text-slate-700 min-w-0">
+            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">{{ title }}</div>
+            {% if cp %}
+                <div class="text-sm font-semibold text-slate-900 break-words">{{ cp.name }}</div>
+                {% if cp.inn %}
+                    <div class="mt-1"><span class="text-slate-400">ИНН:</span> <span class="font-mono">{{ cp.inn }}</span></div>
+                {% endif %}
+                {% if cp.address %}
+                    <div class="mt-1 break-words"><span class="text-slate-400">Адрес:</span> {{ cp.address }}</div>
+                {% endif %}
+                {% if cp.contact_info %}
+                    <div class="mt-1 break-words"><span class="text-slate-400">Контакт:</span> {{ cp.contact_info }}</div>
+                {% endif %}
+            {% else %}
+                <div class="text-slate-400 italic">Не указан</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>

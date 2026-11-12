@@ -199,6 +199,8 @@ class Container(Base):
     items = relationship("CargoItem", back_populates="container", cascade="all, delete-orphan")
     voyage_id = Column(Integer, ForeignKey("voyages.id"), nullable=True)
     voyage = relationship("Voyage", back_populates="containers")
+    # Номер коносамента, присваивается при постановке контейнера в рейс
+    bl_number = Column(String, nullable=True, index=True, comment="Номер коносамента")
 
 class CargoItem(Base):
     __tablename__ = "cargo_items"
