@@ -33,7 +33,10 @@
             👷 Панель оператора
             </button>
             {% endif %}
-            <!-- Уведомления: колокольчик со счётчиком непрочитанных -->
+            <!-- Уведомления: колокольчик со счётчиком непрочитанных.
+                 Только для вошедшего пользователя: на странице входа запрос счётчика
+                 вернул бы 401 с HX-Redirect на /login и зациклил страницу. -->
+            {% if user %}
             <button hx-get="/api/notifications" hx-target="main" title="Уведомления"
                     class="relative text-white hover:text-blue-100 cursor-pointer">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -44,6 +47,7 @@
                       hx-trigger="load, every 60s, notificationsRead from:body"
                       hx-swap="innerHTML"></span>
             </button>
+            {% endif %}
             <button hx-post="/api/logout" hx-target="body" class="text-sm bg-red-500 px-3 py-1 rounded">Выйти</button>
         </div>
     </nav>
