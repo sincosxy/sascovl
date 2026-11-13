@@ -32,6 +32,11 @@
     </td>
     <td class="px-3 py-2 text-xs whitespace-nowrap {{ 'text-gray-700' if con.seal else 'text-red-600 font-semibold' }}">
         {{ con.seal or 'нет пломбы' }}
+        {% if con.arrived_at %}
+            <div class="text-[11px] text-emerald-700 font-normal">✓ принят {{ con.arrived_at.strftime('%d.%m.%Y') }}</div>
+        {% else %}
+            <div class="text-[11px] text-red-600 font-semibold">не принят на терминал</div>
+        {% endif %}
     </td>
     <td class="px-3 py-2 text-xs text-gray-700 whitespace-nowrap">
         {{ con.weight_gross or 0 }} кг · {{ con.pieces or 0 }} мест
@@ -88,7 +93,7 @@
                             <th class="px-3 py-2">Заказ</th>
                             <th class="px-3 py-2">Стороны</th>
                             <th class="px-3 py-2">Маршрут заявки</th>
-                            <th class="px-3 py-2">Пломба</th>
+                            <th class="px-3 py-2">Пломба / терминал</th>
                             <th class="px-3 py-2">Вес / места</th>
                         </tr>
                     </thead>
@@ -156,7 +161,7 @@
                             <th class="px-3 py-2">Заказ</th>
                             <th class="px-3 py-2">Стороны</th>
                             <th class="px-3 py-2">Маршрут заявки</th>
-                            <th class="px-3 py-2">Пломба</th>
+                            <th class="px-3 py-2">Пломба / терминал</th>
                             <th class="px-3 py-2">Вес / места</th>
                         </tr>
                     </thead>
@@ -166,7 +171,7 @@
                         <tr class="hover:bg-gray-50 {{ 'opacity-60' if missing }}">
                             <td class="px-3 py-2">
                                 {% if missing %}
-                                    <span class="cursor-help" title="Нельзя поставить в рейс: не указано — {{ missing|join(', ') }}">🚫</span>
+                                    <span class="cursor-help" title="Нельзя поставить в рейс: не хватает — {{ missing|join(', ') }}">🚫</span>
                                 {% else %}
                                     <input type="checkbox" name="container_ids" value="{{ con.id }}">
                                 {% endif %}

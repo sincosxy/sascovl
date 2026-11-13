@@ -41,6 +41,7 @@
                             <th class="p-2 text-left">Номер контейнера</th>
                             <th class="p-2 text-left">ПИН на выдачу</th>
                             <th class="p-2 text-left">Пломба</th>
+                            <th class="p-2 text-left">Поступление на терминал</th>
                             <th class="p-2 text-center text-gray-400"><i class="fas fa-cog"></i></th>
                         </tr>
                     </thead>
@@ -97,6 +98,9 @@
                             </td>
                             <td class="p-2 min-w-[150px]">
                                 <div class="font-bold">{{ con.seal if con.seal else 'Не указана' }}</div>
+                            </td>
+                            <td class="p-2">
+                                {% include "partials/arrival_cell.html" %}
                             </td>
                             <td class="p-2 text-center" id="actions-{{ con.id }}">
                                 {% if not con.is_cancelled %}

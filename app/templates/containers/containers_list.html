@@ -8,10 +8,10 @@
                     {{ containers|length }} шт.
                 </span>
             </h1>
-            <p class="text-sm text-gray-500 mt-1">Активные — ещё не поставленные в рейс. После переноса в рейс контейнер уходит в «Распланированные». В рейс можно перенести только контейнер с номером и пломбой.</p>
+            <p class="text-sm text-gray-500 mt-1">«Ждут приёма» — клиент указал (или ещё укажет) пломбу, а поступление на терминал не подтверждено. Активные — ещё не поставленные в рейс. В рейс можно перенести только контейнер с номером, пломбой и подтверждённым поступлением на терминал.</p>
             <!-- Фильтр по состоянию -->
             <div class="mt-3 inline-flex rounded-lg border border-gray-300 bg-white overflow-hidden text-sm">
-                {% for key, label in [('active', 'Активные'), ('planned', 'Распланированные'), ('cancelled', 'Отменённые'), ('all', 'Все')] %}
+                {% for key, label in [('arrival', 'Ждут приёма'), ('active', 'Активные'), ('planned', 'Распланированные'), ('cancelled', 'Отменённые'), ('all', 'Все')] %}
                 <button hx-get="/containers/?view={{ key }}" hx-target="#main-content"
                         class="px-3 py-1.5 cursor-pointer transition {{ 'bg-blue-600 text-white font-semibold' if view == key else 'text-gray-600 hover:bg-gray-50' }}">
                     {{ label }}
@@ -38,6 +38,22 @@
     </div>
 
     {% include "partials/assign_report.html" %}
+
+    <!-- Групповое подтверждение поступления на терминал -->
+    {% if view in ('arrival', 'active', 'all') %}
+    <form hx-post="/containers/arrival" hx-target="#main-content"
+          hx-include="#containers-table-body input[name='container_ids']"
+          class="mb-3 p-3 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-wrap items-center gap-3 text-sm">
+        <input type="hidden" name="view" value="{{ view }}">
+        <span class="font-semibold text-gray-700">Выбранные — приняты на терминал:</span>
+        <input type="date" name="arrived_at" value="{{ today().isoformat() }}" max="{{ today().isoformat() }}" required
+               class="border border-gray-300 rounded-lg px-2 py-1.5 bg-white">
+        <span class="text-xs text-gray-500">Без пломбы и уже принятые будут пропущены.</span>
+        <button type="submit" class="ml-auto px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold cursor-pointer transition">
+            Подтвердить поступление
+        </button>
+    </form>
+    {% endif %}
 
     <!-- Групповой перенос выбранных контейнеров в рейс -->
     {% if view in ('active', 'all') %}

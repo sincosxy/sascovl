@@ -69,7 +69,11 @@ async def notifications_list(
     response = templates.TemplateResponse(
         request=request,
         name="partials/notifications.html",
-        context={"notifications": notifications}
+        context={
+            "notifications": notifications,
+            # Оператору ссылка ведёт на обработку заявки, клиенту — на её просмотр
+            "staff": current_user.role in (UserRole.OPERATOR, UserRole.ADMIN),
+        }
     )
 
     # Шаблон уже отрисован с пометками «новое» — теперь можно гасить счётчик

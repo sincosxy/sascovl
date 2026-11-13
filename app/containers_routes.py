@@ -23,12 +23,30 @@ router = APIRouter(
     dependencies=[Depends(require_staff)],
     tags=["containers"]
 )
-from app.bl import missing_for_voyage, assign_containers_to_voyage, sync_order_status, BL_MODE_PER_CONTAINER, BL_MODE_PER_ORDER
+from app.bl import (
+    missing_for_voyage, assign_containers_to_voyage, sync_order_status, BL_MODE_PER_CONTAINER, BL_MODE_PER_ORDER,
+    confirm_arrival, cancel_arrival, local_today,
+)
 
 templates = Jinja2Templates(directory="app/templates")
 templates.env.globals["missing_for_voyage"] = missing_for_voyage
+templates.env.globals["today"] = local_today
 
-CONTAINER_VIEWS = ("active", "planned", "cancelled", "all")
+CONTAINER_VIEWS = ("arrival", "active", "planned", "cancelled", "all")
+
+# Связи, которые нужны шаблону containers/container_row.html
+ROW_OPTIONS = (
+    joinedload(Container.equipment),
+    joinedload(Container.voyage),
+    joinedload(Container.order).joinedload(CargoOrder.owner).joinedload(User.company),
+)
+
+
+def parse_date(value) -> Optional[date]:
+    try:
+        return date.fromisoformat(value) if value else None
+    except ValueError:
+        return None
 
 
 async def render_containers_list(
@@ -37,8 +55,8 @@ async def render_containers_list(
     view: str = "active",
     report: Optional[dict] = None,
 ):
-    """Список контейнеров. view: active — свободные (не в рейсе), planned — распланированные,
-    cancelled — отменённые, all — все."""
+    """Список контейнеров. view: arrival — ждут приёма на терминал, active — свободные (не в рейсе),
+    planned — распланированные, cancelled — отменённые, all — все."""
     if view not in CONTAINER_VIEWS:
         view = "active"
     db.expire_all()
@@ -54,7 +72,15 @@ async def render_containers_list(
             )
             .order_by(Container.id.desc())
     )
-    if view == "active":
+    if view == "arrival":
+        query = query.join(CargoOrder, Container.order_id == CargoOrder.id).where(
+            Container.voyage_id.is_(None),
+            Container.is_cancelled.isnot(True),
+            Container.arrived_at.is_(None),
+            CargoOrder.is_valid == True,
+            CargoOrder.status != "draft",
+        )
+    elif view == "active":
         query = query.where(Container.voyage_id.is_(None), Container.is_cancelled.isnot(True))
     elif view == "planned":
         query = query.where(Container.voyage_id.isnot(None), Container.is_cancelled.isnot(True))
@@ -119,6 +145,69 @@ async def assign_voyage(
     else:
         report = await assign_containers_to_voyage(db, voyage_id, container_ids, bl_mode)
     return await render_containers_list(request, db, view=view, report=report)
+
+
+@router.post("/arrival", response_class=HTMLResponse)
+async def confirm_arrival_bulk(
+    request: Request,
+    container_ids: list[int] = Form([]),
+    arrived_at: Optional[str] = Form(None),
+    view: str = Form("arrival"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_staff),
+):
+    """Групповое подтверждение поступления выбранных контейнеров на терминал."""
+    report = await confirm_arrival(db, container_ids, parse_date(arrived_at), current_user.id)
+    return await render_containers_list(request, db, view=view, report=report)
+
+
+async def _render_arrival(request: Request, db: AsyncSession, container_id: int, row: bool, error: Optional[str]):
+    """Ответ на отметку поступления: строка списка контейнеров или только блок поступления."""
+    db.expire_all()
+    result = await db.execute(select(Container).options(*ROW_OPTIONS).where(Container.id == container_id))
+    container = result.scalars().first()
+    if not container:
+        raise HTTPException(status_code=404, detail="Контейнер не найден")
+    if row:
+        return templates.TemplateResponse(
+            name="containers/container_row.html", request=request,
+            context={"container": container, "arrival_error": error},
+        )
+    return templates.TemplateResponse(
+        name="partials/arrival_cell.html", request=request,
+        context={"con": container, "arrival_error": error},
+    )
+
+
+@router.post("/{container_id}/arrival", response_class=HTMLResponse)
+async def confirm_arrival_one(
+    container_id: int,
+    request: Request,
+    row: bool = False,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_staff),
+):
+    """Подтверждение поступления одного контейнера (из строки списка или со страницы заявки)."""
+    form = await request.form()
+    raw = form.get(f"arrived_at_{container_id}") or form.get("arrived_at")
+    arrived_at = parse_date(raw)
+    if raw and not arrived_at:
+        error = "Неверная дата"
+    else:
+        report = await confirm_arrival(db, [container_id], arrived_at, current_user.id)
+        error = report["error"] or ("; ".join(report["skipped"]) or None)
+    return await _render_arrival(request, db, container_id, row, error)
+
+
+@router.post("/{container_id}/arrival/cancel", response_class=HTMLResponse)
+async def cancel_arrival_one(
+    container_id: int,
+    request: Request,
+    row: bool = False,
+    db: AsyncSession = Depends(get_db),
+):
+    error = await cancel_arrival(db, container_id)
+    return await _render_arrival(request, db, container_id, row, error)
 
 
 @router.get("/{container_id}/edit", response_class=HTMLResponse)

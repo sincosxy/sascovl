@@ -1,4 +1,4 @@
-{# Итог групповой операции с контейнерами. Ожидает report: assigned / removed / skipped / warnings / error #}
+{# Итог групповой операции с контейнерами. Ожидает report: assigned / removed / arrived / skipped / warnings / error #}
 {% if report %}
 <div class="mb-4 space-y-2 text-sm">
     {% if report.error %}
@@ -7,6 +7,11 @@
     {% if report.assigned %}
         <div class="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800">
             Поставлено в рейс контейнеров: <strong>{{ report.assigned }}</strong>
+        </div>
+    {% endif %}
+    {% if report.arrived %}
+        <div class="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800">
+            Принято на терминал контейнеров: <strong>{{ report.arrived }}</strong>
         </div>
     {% endif %}
     {% if report.removed %}

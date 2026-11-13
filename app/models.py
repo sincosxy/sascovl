@@ -212,6 +212,11 @@ class Container(Base):
     # Номер коносамента, присваивается при постановке контейнера в рейс
     bl_number = Column(String, nullable=True, index=True, comment="Номер коносамента")
 
+    # Поступление на терминал: подтверждает оператор после того, как клиент указал пломбу.
+    # Только принятый контейнер можно ставить в рейс.
+    arrived_at = Column(Date, nullable=True, comment="Дата поступления на терминал")
+    arrival_confirmed_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
 class CargoItem(Base):
     __tablename__ = "cargo_items"
     

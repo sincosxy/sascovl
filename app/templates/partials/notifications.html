@@ -13,7 +13,7 @@
                     <span>{{ n.created_at|vlad_time }}</span>
                     {% if not n.is_read %}<span class="text-blue-600 font-semibold">новое</span>{% endif %}
                     {% if n.order_id %}
-                        <button hx-get="/api/orders/{{ n.order_id }}/summary" hx-target="#main-content"
+                        <button hx-get="{{ '/api/operator/orders/%d/manage' % n.order_id if staff else '/api/orders/%d/summary' % n.order_id }}" hx-target="#main-content"
                                 class="text-blue-600 hover:underline cursor-pointer">Открыть заявку №{{ n.order_id }}</button>
                     {% endif %}
                 </div>

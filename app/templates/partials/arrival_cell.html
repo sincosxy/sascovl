@@ -1,0 +1,40 @@
+{# Поступление контейнера на терминал (оператор). Ожидает con; arrival_row = true — ответ заменяет
+   всю строку списка контейнеров (#container-row-ID), иначе только этот блок.
+   Обращается только к колонкам контейнера: связи не нужны. #}
+{% set arrival_target = '#container-row-' ~ con.id if arrival_row else '#arrival-' ~ con.id %}
+{% set arrival_qs = '?row=1' if arrival_row else '' %}
+<div id="arrival-{{ con.id }}" class="text-xs">
+    {% if con.is_cancelled %}
+    {% elif con.arrived_at %}
+        <div class="flex items-center gap-1.5 whitespace-nowrap">
+            <span class="text-emerald-700 font-semibold">✓ Принят {{ con.arrived_at.strftime('%d.%m.%Y') }}</span>
+            {% if not con.voyage_id %}
+                <button type="button" title="Отменить отметку о поступлении"
+                        hx-post="/containers/{{ con.id }}/arrival/cancel{{ arrival_qs }}"
+                        hx-target="{{ arrival_target }}" hx-swap="outerHTML"
+                        hx-params="none"
+                        hx-confirm="Отменить отметку о поступлении контейнера на терминал?"
+                        class="text-gray-400 hover:text-red-600 cursor-pointer">✕</button>
+            {% endif %}
+        </div>
+    {% elif con.seal %}
+        <div class="flex items-center gap-1 whitespace-nowrap">
+            <input type="date" id="arrival-date-{{ con.id }}" name="arrived_at_{{ con.id }}"
+                   value="{{ today().isoformat() }}" max="{{ today().isoformat() }}"
+                   class="border border-gray-300 rounded px-1 py-0.5 text-xs bg-white">
+            <button type="button"
+                    hx-post="/containers/{{ con.id }}/arrival{{ arrival_qs }}"
+                    hx-include="#arrival-date-{{ con.id }}"
+                    hx-params="arrived_at_{{ con.id }}"
+                    hx-target="{{ arrival_target }}" hx-swap="outerHTML"
+                    class="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-semibold cursor-pointer">
+                Принят
+            </button>
+        </div>
+    {% else %}
+        <span class="text-gray-400 italic">ждём пломбу от клиента</span>
+    {% endif %}
+    {% if arrival_error %}
+        <div class="mt-1 text-red-600">{{ arrival_error }}</div>
+    {% endif %}
+</div>

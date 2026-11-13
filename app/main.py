@@ -21,7 +21,10 @@ import httpx, html
 from xhtml2pdf import pisa
 from io import BytesIO
 
-from app.bl import notify_owner, sync_order_status, STATUS_IN_PROGRESS, STATUS_EXECUTING
+from app.bl import (
+    notify_owner, notify_staff, notify_staff_about_seal, container_label, local_today,
+    sync_order_status, STATUS_IN_PROGRESS, STATUS_EXECUTING,
+)
 from app.config import settings
 fit = settings.FIT
 
@@ -42,6 +45,7 @@ templates = Jinja2Templates(directory="app/templates")
 
 
 templates.env.filters["vlad_time"] = format_vladivostok_time
+templates.env.globals["today"] = local_today
 
 app = FastAPI(title="CargoFlow API")#, dependencies=[Depends(verify_auth_cookie)])
 
@@ -1135,6 +1139,16 @@ async def confirm_order(
     
     order.updated_at = datetime.now() 
 
+    # Если пломбы указаны ещё в мастере — сразу сообщаем операторам, что контейнеры можно принимать
+    sealed = [c for c in order.containers if c.seal and not c.is_cancelled]
+    if sealed:
+        await notify_staff(
+            db, order,
+            f"Клиент подтвердил заявку №{order.id} с указанными пломбами: "
+            + ", ".join(f"{container_label(c)} — {c.seal}" for c in sealed)
+            + ". Подтвердите поступление контейнеров на терминал."
+        )
+
     # Здесь можно добавить логику уведомления оператора (email или Telegram)
     
     
@@ -1183,7 +1197,7 @@ async def update_seal(
 
     # Ищем контейнер и проверяем, что заказ принадлежит пользователю
     result = await db.execute(
-        select(Container).join(CargoOrder).where(
+        select(Container).join(CargoOrder).options(joinedload(Container.order)).where(
             Container.id == container_id,
             CargoOrder.owner_id == current_user.id
         )
@@ -1193,10 +1207,20 @@ async def update_seal(
     if not container:
         raise HTTPException(status_code=404)
 
-    # Здесь МЫ НЕ ПРОВЕРЯЕМ статус заказа на DRAFT, 
-    # так как пломбу можно вносить всегда до момента захода в порт
-    container.seal = new_seal.strip().upper() if new_seal else None
-    
+    # Статус заказа на DRAFT не проверяем: пломбу можно вносить до поступления на терминал.
+    # После подтверждения поступления (или постановки в рейс) пломбу правит только оператор.
+    if container.arrived_at or container.voyage_id or container.is_cancelled:
+        raise HTTPException(status_code=409, detail="Контейнер уже принят на терминал — пломбу меняет оператор")
+
+    old_seal = container.seal
+    container.seal = new_seal.strip().upper() if new_seal and new_seal.strip() else None
+
+    # Оператору — уведомление, что пломба указана и контейнер пора принимать.
+    # По черновику не шлём: оператор узнает о пломбах при подтверждении заявки.
+    order = container.order
+    if container.seal and container.seal != old_seal and order.is_valid and order.status != "draft":
+        await notify_staff_about_seal(db, container, order)
+
     await db.commit()
     
     # Возвращаем "Ок" или просто обновленное значение, чтобы HTMX успокоился

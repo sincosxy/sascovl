@@ -42,6 +42,19 @@
 
                 <!-- Правая часть: Юзер и Выход (Десктоп) + Бургер (Мобилка) -->
                 <div class="flex items-center gap-4">
+                    <!-- Уведомления (пломбы от клиентов и т.п.). У счётчика свой hx-target:
+                         иначе он унаследует цель кнопки и затрёт страницу (ловушка 1 в context.md) -->
+                    <button hx-get="/api/notifications" hx-target="#main-content" title="Уведомления"
+                            class="relative text-gray-300 hover:text-white cursor-pointer">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0a3 3 0 11-6 0m6 0H9"></path>
+                        </svg>
+                        <span id="notif-badge"
+                              hx-get="/api/notifications/badge"
+                              hx-target="this"
+                              hx-trigger="load, every 60s, notificationsRead from:body"
+                              hx-swap="innerHTML"></span>
+                    </button>
                     <!-- Инфо о юзере (Только десктоп) -->
                     <div class="text-right hidden md:block">
                         <div class="text-xs text-gray-400">Оператор</div>
@@ -106,7 +119,9 @@
     </main>
 
     <script>
-        document.body.addEventListener('htmx:beforeRequest', () => {
+        document.body.addEventListener('htmx:beforeRequest', (evt) => {
+            // Фоновый опрос счётчика уведомлений не должен перекрывать экран
+            if (evt.detail.elt && evt.detail.elt.id === 'notif-badge') return;
             document.getElementById('global-loader').style.display = 'flex';
         });
         document.body.addEventListener('htmx:afterRequest', () => {

@@ -2,14 +2,14 @@
     <!--td class="px-4 py-2 border-b font-mono {% if container.valid_number == False %}text-red-600 font-bold{% endif %}">
         {{ container.container_number or '---не присвоен---' }}
     </td-->
-    <!-- Выбор для группового переноса: только свободные (не в рейсе, не отменённые) -->
-    <td class="px-3 py-2 border-b">
+    <!-- Выбор для групповых действий (приём на терминал, перенос в рейс): только свободные.
+         🚫 — в рейс пока нельзя; принять на терминал при этом можно. -->
+    <td class="px-3 py-2 border-b whitespace-nowrap">
         {% if not container.is_cancelled and not container.voyage_id %}
+            <input type="checkbox" name="container_ids" value="{{ container.id }}">
             {% set missing = missing_for_voyage(container) %}
             {% if missing %}
-                <span class="cursor-help" title="Нельзя поставить в рейс: не указано — {{ missing|join(', ') }}">🚫</span>
-            {% else %}
-                <input type="checkbox" name="container_ids" value="{{ container.id }}">
+                <span class="cursor-help text-xs" title="Нельзя поставить в рейс: не хватает — {{ missing|join(', ') }}">🚫</span>
             {% endif %}
         {% endif %}
     </td>
@@ -76,6 +76,11 @@
             <div class="font-mono font-bold text-gray-900">{{ container.bl_number or 'без коносамента' }}</div>
         {% else %}
             <span class="text-green-600">Активен</span>
+        {% endif %}
+        {% if not container.is_cancelled %}
+            <div class="mt-1">
+                {% with con=container, arrival_row=true %}{% include "partials/arrival_cell.html" %}{% endwith %}
+            </div>
         {% endif %}
     </td>
     <!-- Новая колонка Действий -->

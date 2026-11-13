@@ -54,6 +54,13 @@
                             {% endif %}
                         {% endif %}
 
+                        <!-- Поступление на терминал -->
+                        {% if con.arrived_at and not con.is_cancelled and not con.voyage_id %}
+                            <span class="text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-2.5 py-0.5">
+                                ✓ Принят на терминал {{ con.arrived_at.strftime('%d.%m.%Y') }}
+                            </span>
+                        {% endif %}
+
                         <!-- Вывод причины отмены -->
                         {% if con.is_cancelled %}
                             <span class="text-[11px] font-medium text-rose-700 bg-rose-50 border border-rose-100 rounded-lg px-2.5 py-0.5 flex items-center gap-1">
@@ -74,16 +81,22 @@
                             </span>
                         {% endif %}
 
-                        <!-- Блок ввода пломбы -->
+                        <!-- Блок ввода пломбы. После поступления на терминал пломбу меняет только оператор -->
                         <div class="flex items-center gap-2 relative">
                             <span class="text-xs font-medium text-slate-400">Пломба:</span>
+                            {% if con.arrived_at or con.voyage_id %}
+                                <span class="text-xs font-bold text-slate-700">{{ con.seal or '—' }}</span>
+                            {% else %}
+                            <!-- Сохраняется при уходе с поля или по Enter: каждое сохранение уведомляет оператора -->
                             <input type="text" 
                                 name="seal" 
                                 value="{{ con.seal or '' }}" 
                                 placeholder="Введите №"
                                 {% if con.is_cancelled %}disabled{% endif %}
                                 hx-patch="/api/orders/containers/{{ con.id }}/update-seal"
-                                hx-trigger="keyup changed delay:1s"
+                                hx-trigger="change"
+                                hx-swap="none"
+                                onkeydown="if (event.key === 'Enter') { event.preventDefault(); this.blur(); }"
                                 class="text-xs font-medium text-slate-700 border-b border-dashed border-slate-300 focus:border-indigo-500 focus:text-indigo-600 outline-none bg-transparent w-24 pb-0.5 transition-colors disabled:border-transparent disabled:text-slate-400">
                             
                             <!-- Спиннер HTMX -->
@@ -93,6 +106,7 @@
                                     <circle class="opacity-75" fill="currentColor" cx="12" cy="12" r="10"></circle>
                                 </svg>
                             </div>
+                            {% endif %}
                         </div>
                         
                         <!-- Владение контейнером -->
